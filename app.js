@@ -200,6 +200,11 @@ function pastilla(r) {
 }
 
 // --- Vista lista: lo mejor de cada mirador ese día ---------------------------
+// Si Open-Meteo no respondió al calcular, las notas no cuentan las nubes.
+function sinTiempo() {
+  return datos.sin_tiempo ? el('strong', { class: 'sin-tiempo' }, ' Ojo: esta vez no se pudo consultar la previsión del tiempo; las notas suponen el cielo despejado.') : null;
+}
+
 function pintarLista() {
   const filas = Object.keys(datos.miradores)
     .map(clave => ({ clave, mejor: mejorObjetivo(clave) }))
@@ -216,7 +221,7 @@ function pintarLista() {
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
     }))),
-    el('p', { class: 'pie' }, `Toca un localizador o un mirador para ver el plan. Previsión del ${datos.generado}.`),
+    el('p', { class: 'pie' }, `Toca un localizador o un mirador para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ];
 }
 
@@ -380,7 +385,7 @@ function pintarMirador() {
   if (r.otro_dia) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día'), r.otro_dia));
   if (r.ideal) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Momento ideal más cercano'), r.ideal));
   if (alternativas.length) partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Alternativas'), ...alternativas));
-  partes.push(el('p', { class: 'pie' }, `El tiempo es una previsión y puede cambiar: revísalo el mismo día. Previsión del ${datos.generado}.`));
+  partes.push(el('p', { class: 'pie' }, `El tiempo es una previsión y puede cambiar: revísalo el mismo día. Previsión del ${datos.generado}.`, sinTiempo()));
   return partes;
 }
 
@@ -425,8 +430,16 @@ fetch('datos.json', { cache: 'no-cache' })
     estado.dia = datos.dias[0];
     leerEnlace();
     iniciarMapa();
-    document.getElementById('plegar').addEventListener('click', () =>
-      plegar(!document.getElementById('panel').classList.contains('plegado')));
+    document.getElementById('plegar').addEventListener('click', e => {
+      e.stopPropagation();
+      plegar(!document.getElementById('panel').classList.contains('plegado'));
+    });
+    // En el móvil: tocar el mapa recoge el panel (mapa grande) y tocar la
+    // barra del panel recogido lo vuelve a abrir.
+    mapa.on('click', () => { if (!esOrdenador()) plegar(true); });
+    document.querySelector('.cabecera').addEventListener('click', () => {
+      if (document.getElementById('panel').classList.contains('plegado')) plegar(false);
+    });
     pintarTodo();
     if (estado.mirador) {
       const m = datos.miradores[estado.mirador];

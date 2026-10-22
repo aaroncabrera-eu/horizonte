@@ -82,6 +82,9 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
   max-height: 48dvh; display: flex; flex-direction: column;
   background: var(--fondo); border-radius: 24px 24px 0 0; box-shadow: var(--sombra);
 }
+/* En el iPhone, que el panel no quede bajo la barrita de inicio. */
+.panel { padding-bottom: env(safe-area-inset-bottom); }
+.panel.plegado .cabecera { cursor: pointer; }
 .panel.con-ficha { max-height: 72dvh; }
 .panel.plegado .contenido { display: none; }
 @media (min-width: 900px) {
@@ -115,6 +118,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
   text-transform: uppercase; color: var(--suave);
 }
 .pie { font-size: 12px; color: var(--suave); margin: 4px 0 0; line-height: 1.45; }
+.sin-tiempo { display: block; margin-top: 6px; color: var(--amarillo); }
 
 /* Días: una sola fila de seis, iguales. */
 .dias { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
