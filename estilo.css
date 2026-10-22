@@ -86,6 +86,17 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .panel { padding-bottom: env(safe-area-inset-bottom); }
 .panel.plegado .cabecera { cursor: pointer; }
 .panel.con-ficha { max-height: 72dvh; }
+.panel.grande { max-height: 92dvh; }
+/* Móvil: la barra de arriba se arrastra con el dedo; la rayita gris lo indica. */
+@media (max-width: 899px) {
+  .cabecera { touch-action: none; position: relative; padding-top: 22px; }
+  .cabecera::before {
+    content: ''; position: absolute; top: 8px; left: 50%; width: 40px; height: 5px;
+    margin-left: -20px; border-radius: 3px; background: #C3CCD5;
+  }
+  .panel { transition: max-height .25s ease; }
+  .panel.arrastrando { transition: none; }
+}
 .panel.plegado .contenido { display: none; }
 @media (min-width: 900px) {
   .panel {

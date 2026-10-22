@@ -406,9 +406,55 @@ function cerrarMirador() {
 }
 
 // Esconder el panel para ver el mapa entero (y volver a sacarlo).
+// Deslizar el panel con el dedo (móvil), arrastrando su barra de arriba:
+// hacia arriba crece hasta casi toda la pantalla; hacia abajo vuelve al
+// tamaño normal o se recoge. Al soltar se queda en la posición más cercana.
+let arrastrado = 0;     // cuándo acabó el último arrastre (para no tomarlo por un toque)
+
+function conectarDeslizar() {
+  const panel = document.getElementById('panel'), barra = panel.querySelector('.cabecera');
+  let inicioY = null, inicioAlto = 0, movido = false;
+  barra.addEventListener('pointerdown', e => {
+    if (esOrdenador()) return;
+    inicioY = e.clientY; inicioAlto = panel.offsetHeight; movido = false;
+  });
+  barra.addEventListener('pointermove', e => {
+    if (inicioY === null) return;
+    const dy = e.clientY - inicioY;
+    if (!movido && Math.abs(dy) < 8) return;       // aún puede ser un toque
+    if (!movido) {
+      movido = true;
+      // Solo ahora: un toque sin mover sigue llegando al botón "Ver mapa".
+      try { barra.setPointerCapture(e.pointerId); } catch { /* puntero ya suelto */ }
+      panel.classList.add('arrastrando');
+      panel.classList.remove('plegado');
+    }
+    const alto = Math.min(window.innerHeight * 0.92, Math.max(barra.offsetHeight, inicioAlto - dy));
+    panel.style.maxHeight = panel.style.height = `${alto}px`;
+  });
+  const soltar = () => {
+    if (inicioY === null) return;
+    inicioY = null;
+    if (!movido) return;
+    arrastrado = Date.now();
+    const alto = panel.offsetHeight, pantalla = window.innerHeight;
+    const normal = pantalla * (panel.classList.contains('con-ficha') ? 0.72 : 0.48);
+    panel.classList.remove('arrastrando');
+    panel.style.maxHeight = panel.style.height = '';
+    if (alto < pantalla * 0.25) plegar(true);
+    else {
+      plegar(false);
+      panel.classList.toggle('grande', alto > (normal + pantalla * 0.92) / 2);
+    }
+  };
+  barra.addEventListener('pointerup', soltar);
+  barra.addEventListener('pointercancel', soltar);
+}
+
 function plegar(si) {
   const panel = document.getElementById('panel'), boton = document.getElementById('plegar');
   panel.classList.toggle('plegado', si);
+  if (si) panel.classList.remove('grande');
   boton.textContent = si ? 'Mostrar panel' : 'Ver mapa';
   boton.setAttribute('aria-expanded', String(!si));
 }
@@ -438,8 +484,10 @@ fetch('datos.json', { cache: 'no-cache' })
     // barra del panel recogido lo vuelve a abrir.
     mapa.on('click', () => { if (!esOrdenador()) plegar(true); });
     document.querySelector('.cabecera').addEventListener('click', () => {
+      if (Date.now() - arrastrado < 400) return;      // era un deslizamiento, no un toque
       if (document.getElementById('panel').classList.contains('plegado')) plegar(false);
     });
+    conectarDeslizar();
     pintarTodo();
     if (estado.mirador) {
       const m = datos.miradores[estado.mirador];
