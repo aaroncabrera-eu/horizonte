@@ -36,7 +36,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 /* Controles de Leaflet con el mismo aspecto que el panel. */
 .leaflet-top.leaflet-left { display: flex; flex-direction: row; align-items: flex-start; }
 .leaflet-left .leaflet-control { margin-left: 16px; }
-.leaflet-top .leaflet-control { margin-top: 16px; }
+.leaflet-top .leaflet-control { margin-top: calc(16px + env(safe-area-inset-top)); }
 .leaflet-left .leaflet-control + .leaflet-control { margin-left: 8px; }
 .leaflet-control-layers, .leaflet-bar {
   border: none !important; border-radius: 14px !important; box-shadow: var(--sombra) !important;
