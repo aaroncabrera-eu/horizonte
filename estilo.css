@@ -82,6 +82,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
   max-height: 48dvh; display: flex; flex-direction: column;
   background: var(--fondo); border-radius: 24px 24px 0 0; box-shadow: var(--sombra);
 }
+.panel.con-ficha { max-height: 72dvh; }
 .panel.plegado .contenido { display: none; }
 @media (min-width: 900px) {
   .panel {

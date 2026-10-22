@@ -410,6 +410,9 @@ function plegar(si) {
 
 function pintarTodo() {
   pintarMapa();
+  // En el móvil, con un mirador abierto el panel sube más: la nota y Tu plan
+  // se ven sin deslizar.
+  document.getElementById('panel').classList.toggle('con-ficha', Boolean(estado.mirador));
   document.getElementById('contenido').replaceChildren(...(estado.mirador ? pintarMirador() : pintarLista()));
   guardarEnlace();
 }
