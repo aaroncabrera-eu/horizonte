@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Horizonte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<!-- El mapa ocupa toda la pantalla; el panel flota encima. -->
+<div id="mapa" class="mapa" aria-label="Mapa de Tenerife con los miradores"></div>
+
+<aside id="panel" class="panel" aria-label="Panel de Horizonte">
+  <div class="cabecera">
+    <div class="marca">
+      <span class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 6v3"/><path d="M5.6 10.6l1.8 1.8"/><path d="M18.4 10.6l-1.8 1.8"/></svg>
+      </span>
+      <span class="nombre">Horizonte</span>
+    </div>
+    <button id="plegar" class="plegar" aria-expanded="true">Ver mapa</button>
+  </div>
+  <div id="contenido" class="contenido"></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

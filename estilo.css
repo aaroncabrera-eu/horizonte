@@ -1,0 +1,223 @@
+/* Horizonte: colores y letras del diseño de pantallas de la lluvia de ideas.
+   Mapa a pantalla completa con un panel flotante encima. Todo lo que flota
+   (panel, controles del mapa) comparte radio, sombra y letra. */
+:root {
+  --fondo: #F4F6F8;
+  --tarjeta: #FFFFFF;
+  --borde: #DCE2E8;
+  --texto: #13202E;
+  --suave: #56657A;
+  --primario: #1D4E6B;
+  --primario-claro: #E6EFF5;
+  --verde: #1F6B3A;      --verde-fondo: #E0F2E6;
+  --amarillo: #765600;   --amarillo-fondo: #FBF0CC;  --amarillo-punto: #D1A62B;
+  --rojo: #9C2F25;       --rojo-fondo: #F9E1DE;
+  --naranja-fondo: #FDF0E1; --naranja: #8A4A12;
+  --pin: #D7352A;
+  --radio: 16px;
+  --sombra: 0 6px 24px rgba(19, 32, 46, .16), 0 1px 3px rgba(19, 32, 46, .08);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--fondo); color: var(--texto); overflow: hidden;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+h2, h3, .nombre { font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
+button { font-family: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; }
+
+/* --- Mapa ------------------------------------------------------------------ */
+.mapa { position: fixed; inset: 0; z-index: 0; background: #cfdde8; font-family: inherit; }
+/* El relieve y el callejero, algo apagados para que no choquen con el panel. */
+.fondo-suave { filter: saturate(.55) brightness(1.04) contrast(.95); }
+
+/* Controles de Leaflet con el mismo aspecto que el panel. */
+.leaflet-top.leaflet-left { display: flex; flex-direction: row; align-items: flex-start; }
+.leaflet-left .leaflet-control { margin-left: 16px; }
+.leaflet-top .leaflet-control { margin-top: 16px; }
+.leaflet-left .leaflet-control + .leaflet-control { margin-left: 8px; }
+.leaflet-control-layers, .leaflet-bar {
+  border: none !important; border-radius: 14px !important; box-shadow: var(--sombra) !important;
+  background: var(--tarjeta); overflow: hidden;
+}
+.leaflet-control-layers-expanded { padding: 6px; font: 600 13px 'Plus Jakarta Sans', sans-serif; color: var(--texto); }
+.leaflet-control-layers-base { display: flex; gap: 4px; }
+.leaflet-control-layers-base label { margin: 0; }
+.leaflet-control-layers-base label > span { display: block; }
+.leaflet-control-layers-base input { position: absolute; opacity: 0; pointer-events: none; }
+.leaflet-control-layers-base input + span {
+  display: block; padding: 7px 12px; border-radius: 10px; cursor: pointer; line-height: 20px;
+}
+.leaflet-control-layers-base input:checked + span { background: var(--primario); color: #fff; }
+.leaflet-control-layers-base input:focus-visible + span { outline: 2px solid var(--primario); }
+.leaflet-bar a, .leaflet-bar a:hover {
+  width: 40px !important; height: 40px !important; line-height: 38px !important;
+  border-bottom-color: var(--borde) !important; color: var(--texto); font-size: 20px;
+}
+.leaflet-control-scale-line {
+  border-color: var(--suave); color: var(--suave); background: rgba(255,255,255,.8);
+  font: 600 11px 'Plus Jakarta Sans', sans-serif;
+}
+.leaflet-control-attribution { font-size: 10px; background: rgba(255,255,255,.75) !important; }
+
+/* Localizador rojo de los miradores y su nombre. */
+.pin { position: relative; width: 30px; height: 42px; transition: transform .15s; transform-origin: 50% 100%; }
+.pin svg { filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.pin.elegido { transform: scale(1.25); }
+.nombre-pin, .etiqueta-mapa {
+  background: var(--tarjeta); border: none; border-radius: 8px; box-shadow: var(--sombra);
+  padding: 3px 8px; font: 600 12px 'Plus Jakarta Sans', sans-serif; color: var(--texto); white-space: nowrap;
+}
+.nombre-pin::before, .etiqueta-mapa::before { display: none; }
+/* Nombres solo con el mapa ampliado (clase que pone app.js según el zoom).
+(Leaflet pone la opacidad en línea, por eso se esconden con visibility.) */
+.nombre-pin { visibility: hidden; pointer-events: none; }
+.con-nombres .nombre-pin { visibility: visible; }
+
+/* --- Panel: abajo en el móvil, a la derecha en el ordenador ------------------ */
+.panel {
+  position: fixed; z-index: 1000; left: 0; right: 0; bottom: 0;
+  max-height: 48dvh; display: flex; flex-direction: column;
+  background: var(--fondo); border-radius: 24px 24px 0 0; box-shadow: var(--sombra);
+}
+.panel.plegado .contenido { display: none; }
+@media (min-width: 900px) {
+  .panel {
+    right: 16px; left: auto; top: 16px; bottom: 16px; width: 404px; max-height: none;
+    border-radius: 24px;
+  }
+  .panel.plegado { bottom: auto; }
+}
+.cabecera {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px 10px;
+}
+.marca { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 34px; height: 34px; border-radius: 10px; background: var(--primario);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+}
+.nombre { font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
+.plegar {
+  min-height: 36px; padding: 0 12px; border-radius: 10px; border: none;
+  background: var(--primario-claro); color: var(--primario); font-weight: 700; font-size: 13px;
+}
+.contenido {
+  overflow-y: auto; scrollbar-width: thin; padding: 4px 18px 22px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.seccion { display: flex; flex-direction: column; gap: 8px; }
+.etiqueta {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--suave);
+}
+.pie { font-size: 12px; color: var(--suave); margin: 4px 0 0; line-height: 1.45; }
+
+/* Días: una sola fila de seis, iguales. */
+.dias { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.dia {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  min-height: 52px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta);
+  font-size: 12px; font-weight: 600; color: var(--suave); padding: 0;
+}
+.dia strong { font-size: 15px; color: var(--texto); }
+.dia[aria-pressed="true"] { background: var(--primario); border-color: var(--primario); color: #DCE8F0; }
+.dia[aria-pressed="true"] strong { color: #fff; }
+
+/* Qué ver: cuatro opciones iguales en una fila. */
+.objetivos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.objetivo {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 64px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta);
+  font-size: 12px; font-weight: 600; padding: 6px 2px;
+}
+.objetivo[aria-pressed="true"] { border: 2px solid var(--primario); background: var(--primario-claro); }
+.objetivo .punto { position: absolute; top: 7px; right: 7px; }
+.punto { width: 9px; height: 9px; border-radius: 5px; display: inline-block; flex-shrink: 0; }
+.punto.verde { background: var(--verde); }
+.punto.amarillo { background: var(--amarillo-punto); }
+.punto.rojo { background: var(--rojo); }
+
+/* Lista de miradores: lo mejor de cada uno ese día. */
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fila {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 12px; min-height: 68px; border-radius: var(--radio);
+  border: 1px solid var(--borde); background: var(--tarjeta); transition: border-color .15s;
+}
+.fila:hover { border-color: #b9c6d2; }
+.icono-obj {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  background: var(--primario-claro); color: var(--primario);
+  display: flex; align-items: center; justify-content: center;
+}
+.fila .texto { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.fila .titulo { font-weight: 700; font-size: 15px; }
+.fila .sub { font-size: 13px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pastilla {
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.pastilla.verde { background: var(--verde-fondo); color: var(--verde); }
+.pastilla.amarillo { background: var(--amarillo-fondo); color: var(--amarillo); }
+.pastilla.rojo { background: var(--rojo-fondo); color: var(--rojo); }
+
+/* --- Vista de un mirador ------------------------------------------------- */
+.volver {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 10px 0 6px; border-radius: 10px; border: none;
+  background: transparent; color: var(--primario); font-weight: 700; font-size: 14px; margin-left: -6px;
+}
+.cabeza-ficha h2 { margin: 0; font-size: 26px; line-height: 1.1; letter-spacing: -.01em; }
+.cabeza-ficha p { margin: 4px 0 0; color: var(--suave); font-size: 13px; line-height: 1.45; }
+.estado { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 20px; }
+.estado.verde { background: var(--verde-fondo); }
+.estado.amarillo { background: var(--amarillo-fondo); }
+.estado.rojo { background: var(--rojo-fondo); }
+.estado .fila-estado { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.estado h3 { margin: 0; font: 700 22px/1.15 'Bricolage Grotesque', sans-serif; }
+.estado .hora { font-size: 15px; font-weight: 600; }
+.nota-puntos { text-align: right; line-height: 1; }
+.nota-puntos strong { font: 700 30px 'Bricolage Grotesque', sans-serif; }
+.nota-puntos span { display: block; font-size: 11px; color: var(--suave); margin-top: 2px; }
+.datos-estado { display: flex; flex-wrap: wrap; gap: 6px; }
+.dato {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.75); font-size: 13px; font-weight: 700;
+}
+.dato.ideal { color: var(--naranja); }
+.caja {
+  display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  border-radius: 20px; background: var(--tarjeta); border: 1px solid var(--borde);
+}
+.caja h4 {
+  margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--suave);
+}
+.momentos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.momentos li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; font-size: 14px; }
+.momentos .icono {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  background: var(--primario-claro); color: var(--primario);
+  display: flex; align-items: center; justify-content: center;
+}
+.momentos li.mejor .icono { background: var(--naranja-fondo); color: var(--naranja); }
+.momentos li.mejor { font-weight: 700; }
+.consejo { background: var(--naranja-fondo); border: none; }
+.consejo .titulo-consejo { display: flex; align-items: center; gap: 8px; color: var(--naranja); font-weight: 700; }
+.consejo p { margin: 0; line-height: 1.5; font-size: 14px; }
+.porque { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; font-size: 14px; }
+.boton {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  min-height: 24px; padding: 0; border: none; background: transparent; font-weight: 700; font-size: 15px;
+}
+.boton svg { transition: transform .15s; }
+.boton[aria-expanded="true"] svg { transform: rotate(180deg); }
+.alternativa { line-height: 1.45; font-size: 14px; }
+.alternativa strong { display: block; font-size: 12px; color: var(--suave); }
+.dibujo { touch-action: none; cursor: crosshair; max-width: 300px; margin: 0 auto; width: 100%; }
+.dibujo svg { width: 100%; height: auto; display: block; }
+.lectura { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; min-height: 2.9em; text-align: center; }
+.nota { font-size: 12px; color: var(--suave); line-height: 1.45; margin: 0; }
