@@ -578,7 +578,9 @@ function cabezaMirador(m) {
     m.teide != null ? el('span', { class: 'teide' }, el('span', { class: 'triangulo' }), 'Se ve el Teide') : null);
 }
 
-const textoVolver = () => estado.ocasiones ? 'Próximas ocasiones' : 'Spots';
+// Al abrir un spot desde las ocasiones se sale de ellas: atrás o tocar el
+// mapa llevan a la lista de spots (Aaron, 23-10-2026).
+const textoVolver = () => 'Spots';
 
 function pintarResumen() {
   const m = datos.miradores[estado.mirador];
@@ -741,7 +743,7 @@ function pintarOcasiones() {
           el('span', { class: 'sub' }, `${cuandoOcasion(o)} · ${partesNombre(datos.miradores[o.spot].nombre)[0]}`),
           el('span', { class: 'sub explica-ocasion' }, o.texto + (dia ? '' : ' Aún sin previsión del tiempo.')))];
       return el('li', {}, dia
-        ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
+        ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; estado.ocasiones = false; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
         : el('div', { class: 'fila' }, ...contenido));
     })))),
   ];
