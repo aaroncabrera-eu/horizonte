@@ -288,3 +288,5 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 }
 .opcion-aviso strong { color: var(--primario); }
 .opcion-aviso span { color: var(--suave); font-size: 12.5px; }
+/* Lo que verás: el horizonte de frente, con el camino del astro. */
+.frente svg { width: 100%; height: auto; display: block; border-radius: 12px; font-family: 'Plus Jakarta Sans', sans-serif; }

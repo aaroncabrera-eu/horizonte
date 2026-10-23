@@ -375,6 +375,83 @@ function pintarRueda(m, azimut) {
 // Al tocar la rueda (o pasar el ratón): qué hay en esa dirección. En el móvil,
 // un toque coloca la línea y luego se puede arrastrar cogiéndola (Aaron,
 // 23-10-2026); deslizar por el resto de la rueda sigue moviendo el panel.
+// --- Lo que verás: el horizonte de frente, como por la cámara ---------------
+// (Aaron, 23-10-2026). La silueta mirando hacia el astro y su camino cada
+// 5 minutos (r.camino: [hora, azimut, altura]). Las alturas van exageradas
+// para que se lea; el dibujo dice cuánto.
+const FRENTE = { W: 360, H: 210, ARRIBA: 20, ABAJO: 24 };
+const SUELO = { mar: '#A3C6DE', isla: '#9AAA8E', tierra: '#5F6F52' };
+
+function pintarFrente(m, r, objetivo) {
+  const { W, H, ARRIBA, ABAJO } = FRENTE;
+  const camino = r.camino;
+  const rel = (az, c) => ((az - c + 540) % 360) - 180;            // grados respecto al centro
+  const c = r.azimut ?? camino[Math.floor(camino.length / 2)][1];
+  const separacion = Math.max(...camino.map(p => Math.abs(rel(p[1], c))));
+  const mitad = Math.max(30, separacion + 10);
+  const hEn = az => {                                               // horizonte, interpolado
+    const a = ((az % 360) + 360) % 360, i = Math.floor(a), f = a - i;
+    return m.horizonte[i] * (1 - f) + m.horizonte[(i + 1) % 360] * f;
+  };
+  const tipo = az => {
+    const d = m.delante[((Math.round(az) % 360) + 360) % 360];
+    return d === 'mar abierto' ? 'mar' : /^(La Palma|La Gomera|Gran Canaria|El Hierro)\b/.test(d) ? 'isla' : 'tierra';
+  };
+  const grados = [];
+  for (let d = -mitad; d <= mitad; d += 0.5) grados.push(d);
+  const alturas = grados.map(d => hEn(c + d));
+  const yMin = Math.min(-1.5, Math.min(...alturas) - 0.5);
+  const yMax = Math.max(...camino.map(p => p[2]), Math.max(...alturas)) + 1.5;
+  const x = d => (d + mitad) / (2 * mitad) * W;
+  const y = h => H - ABAJO - (h - yMin) / (yMax - yMin) * (H - ABAJO - ARRIBA);
+  const exagera = ((H - ABAJO - ARRIBA) / (yMax - yMin)) / (W / (2 * mitad));
+
+  // Suelo por tramos del mismo tipo (mar, otra isla, tierra), cada uno con su color.
+  let suelo = '', desde = 0;
+  for (let i = 1; i <= grados.length; i++) {
+    if (i < grados.length && tipo(c + grados[i]) === tipo(c + grados[desde])) continue;
+    const tramo = grados.slice(desde, Math.min(i + 1, grados.length));
+    const borde = tramo.map(d => `L${x(d).toFixed(1)},${y(hEn(c + d)).toFixed(1)}`).join('');
+    suelo += `<path d="M${x(tramo[0]).toFixed(1)},${H - ABAJO}${borde}L${x(tramo[tramo.length - 1]).toFixed(1)},${H - ABAJO}Z" fill="${SUELO[tipo(c + grados[desde])]}"/>`;
+    desde = i;
+  }
+  // Nombres: el Teide y las islas que entran en el dibujo.
+  const nombres = [];
+  if (m.teide != null && Math.abs(rel(m.teide, c)) < mitad) nombres.push(['Teide', rel(m.teide, c)]);
+  for (const isla of ['La Palma', 'La Gomera', 'Gran Canaria', 'El Hierro']) {
+    const suyos = grados.filter(d => m.delante[((Math.round(c + d) % 360) + 360) % 360].startsWith(isla));
+    if (suyos.length) nombres.push([isla, suyos.reduce((a, b) => hEn(c + b) > hEn(c + a) ? b : a)]);
+  }
+  const etiquetas = nombres.map(([n, d]) =>
+    `<text x="${x(d)}" y="${y(hEn(c + d)) - 6}" font-size="11" font-weight="700" fill="#3E4A35" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">${n}</text>`).join('');
+  // El camino: un punto cada 5 minutos; hueco si lo tapa el relieve.
+  const sol = objetivo !== 'Salida de luna';
+  const puntos = camino.filter(p => Math.abs(rel(p[1], c)) <= mitad).map(([hh, az, h], i) => {
+    const d = rel(az, c), tapado = h < hEn(az) - 0.25;
+    const relleno = tapado ? 'none' : sol ? '#F6D27A' : '#FFFFFF';
+    const punto = `<circle cx="${x(d).toFixed(1)}" cy="${y(h).toFixed(1)}" r="5" fill="${relleno}" stroke="${sol ? '#8A4A12' : '#56657A'}" stroke-width="1.6"${tapado ? ' stroke-dasharray="2 2"' : ''}/>`;
+    const texto = hh.endsWith('0') && y(h) > ARRIBA - 4 && y(h) < H - ABAJO - 2
+      ? `<text x="${(x(d) + 8).toFixed(1)}" y="${(y(h) + 4).toFixed(1)}" font-size="11" fill="#13202E" paint-order="stroke" stroke="#fff" stroke-width="3">${hh}</text>` : '';
+    return punto + texto;
+  }).join('');
+  // Rumbos abajo, cada 10°.
+  let rumbos = '';
+  for (let a = Math.ceil((c - mitad) / 10) * 10; a <= c + mitad; a += 10) {
+    const az = ((a % 360) + 360) % 360;
+    rumbos += `<text x="${x(rel(az, c))}" y="${H - 7}" font-size="10.5" fill="#56657A" text-anchor="middle">${az}° ${a % 45 === 0 ? rumbo(az) : ''}</text>`;
+  }
+  const cielo = sol ? ['#EAF2F8', '#F8DDB4'] : ['#E3EAF2', '#C9D6E4'];
+  return {
+    svg: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="El horizonte de frente desde ${m.nombre}, con el camino del ${sol ? 'sol' : 'la luna'}">
+      <defs><linearGradient id="cielo-frente" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cielo[0]}"/><stop offset="1" stop-color="${cielo[1]}"/></linearGradient></defs>
+      <rect width="${W}" height="${H - ABAJO}" fill="url(#cielo-frente)"/>
+      <line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#13202E" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
+      ${suelo}${etiquetas}${puntos}${rumbos}</svg>`,
+    exagera: Math.max(1, Math.round(exagera)),
+    rumbo: rumbo(c),
+  };
+}
+
 function conectarRueda(dibujo, lectura, m, azInicial) {
   const mover = ev => {
     const caja = dibujo.querySelector('svg').getBoundingClientRect();
@@ -617,6 +694,18 @@ function pintarDetalle() {
     partes.push(el('div', { class: 'caja consejo' },
       el('span', { class: 'titulo-consejo', html: svg('movil', 18) + '<span>Nota para fotografiar con el móvil</span>' }),
       el('p', {}, r.consejo)));
+  }
+
+  // Solo si en algún momento se ve (500 escalones al amanecer: el acantilado
+  // lo tapa todo y la vista sería una pared).
+  const seVe = (r.camino || []).some(([, az, h]) => h >= m.horizonte[Math.round(az) % 360]);
+  if (seVe) {
+    const frente = pintarFrente(m, r, estado.objetivo);
+    partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Lo que verás'),
+      el('div', { class: 'frente', html: frente.svg }),
+      el('p', { class: 'nota' }, `De frente, mirando hacia el ${frente.rumbo}. Cada punto marca dónde estará ` +
+        `${estado.objetivo === 'Salida de luna' ? 'la luna' : 'el sol'} cada 5 minutos; los huecos, cuando lo tapa el relieve. ` +
+        `La línea discontinua es la horizontal${frente.exagera > 1 ? `; alturas ×${frente.exagera} para que se vea bien` : ''}.`)));
   }
 
   const dibujo = el('div', { class: 'dibujo', html: pintarRueda(m, r.azimut) });
