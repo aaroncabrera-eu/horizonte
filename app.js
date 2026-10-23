@@ -22,6 +22,7 @@ const ICONOS = {
   abajo: '<path d="M6 9l6 6 6-6"/>',
   mapa: '<path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5"/><path d="M15 6.5V20"/>',
   ruta: '<path d="M12 21s-6-5.6-6-10.5A6 6 0 0 1 18 10.5C18 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.2"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   compartir: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
 };
@@ -32,8 +33,8 @@ function svg(nombre, tam = 20) {
 const OBJETIVOS = ['Salida de luna', 'Atardecer', 'Amanecer', 'Estrellas'];
 const CORTO = { 'Salida de luna': 'Luna' };
 const EN_ENLACE = { 'Salida de luna': 'luna', 'Atardecer': 'atardecer', 'Amanecer': 'amanecer', 'Estrellas': 'estrellas' };
-const TITULO = { verde: 'Merece la pena', amarillo: 'Regular', rojo: 'No merece la pena' };
-const ORDEN = { verde: 0, amarillo: 1, rojo: 2 };
+const TITULO = { verde: 'Merece la pena', amarillo: 'Regular', rojo: 'No merece la pena', pasado: 'Ya pasó' };
+const ORDEN = { verde: 0, amarillo: 1, rojo: 2, pasado: 3 };
 const VERBO = { 'Salida de luna': 'sale la luna', 'Atardecer': 'se pone el sol',
                 'Amanecer': 'sale el sol', 'Estrellas': 'sin luna' };
 // Cuándo: «Sale la luna a las 18:02»; para las estrellas, si el rato es sin
@@ -55,7 +56,7 @@ function rumbo(az) { return RUMBOS[Math.round(az / 22.5) % 16]; }
 const TENERIFE = [[27.99, -16.93], [28.60, -16.11]];
 
 let datos, mapa, capaMiradores;
-const estado = { dia: null, mirador: null, objetivo: null };
+const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false };
 
 // Crea un elemento con texto (nunca HTML) para no meter nada raro en la página.
 function el(etiqueta, atributos = {}, ...hijos) {
@@ -93,8 +94,17 @@ function destino(lat, lon, az, km) {
   return [f2 * 180 / Math.PI, l2 * 180 / Math.PI];
 }
 
+// Si su hora ya pasó (más de 20 min: los colores siguen un rato tras el
+// atardecer), sale como «Ya pasó» (Aaron, 23-10-2026). Las estrellas (un rato
+// de noche hasta el día siguiente) no se marcan.
+const MARGEN_PASADO_MIN = 20;
+function yaPaso(r, dia) {
+  if (!r.hora || r.hora.includes('-')) return false;
+  return instante(dia, r.hora).getTime() + MARGEN_PASADO_MIN * 60e3 < Date.now();
+}
 function resultado(clave, objetivo) {
-  return datos.miradores[clave].dias[estado.dia][objetivo];
+  const r = datos.miradores[clave].dias[estado.dia][objetivo];
+  return yaPaso(r, estado.dia) ? { ...r, color: 'pasado', marca: '' } : r;
 }
 
 // Orden de «mejor a peor»: color, luego la nota y, si empatan, ⭐ o 🎨.
@@ -112,11 +122,13 @@ function mejorObjetivo(clave) {
 
 // --- Enlace: #mirador/fecha/objetivo -----------------------------------------
 function guardarEnlace() {
-  const partes = estado.mirador ? [estado.mirador, estado.dia, EN_ENLACE[estado.objetivo]].filter(Boolean) : [];
+  const partes = estado.mirador ? [estado.mirador, estado.dia, EN_ENLACE[estado.objetivo]].filter(Boolean)
+    : estado.ocasiones ? ['ocasiones'] : [];
   history.replaceState(null, '', partes.length ? '#' + partes.join('/') : location.pathname);
 }
 function leerEnlace() {
   const [mirador, dia, objetivo] = decodeURIComponent(location.hash.slice(1)).split('/');
+  estado.ocasiones = mirador === 'ocasiones';
   if (datos.dias.includes(dia)) estado.dia = dia;
   if (mirador in datos.miradores) {
     estado.mirador = mirador;
@@ -219,7 +231,7 @@ function botonesDias() {
 // La pastilla: el color en palabras y, si hay puntuación, la nota.
 function pastilla(r) {
   return el('span', { class: `pastilla ${r.color}` },
-    r.puntos != null ? `${coma(r.puntos)}/10` : TITULO[r.color]);
+    r.puntos != null && r.color !== 'pasado' ? `${coma(r.puntos)}/10` : TITULO[r.color]);
 }
 
 // --- Vista lista: lo mejor de cada mirador ese día ---------------------------
@@ -253,7 +265,7 @@ function miradoresALaVista() {
 
 // Al mover el mapa o abrir el panel, la lista cambia (solo sin mirador abierto).
 function refrescarLista() {
-  if (!estado.mirador) document.getElementById('contenido').replaceChildren(...pintarLista());
+  if (!estado.mirador && !estado.ocasiones) document.getElementById('contenido').replaceChildren(...pintarLista());
 }
 
 function pintarLista() {
@@ -262,15 +274,18 @@ function pintarLista() {
   const todos = lejos || filas.length === Object.keys(datos.miradores).length;
   const verTodos = el('button', { class: 'ver-todos', onclick: verTenerife,
     html: svg('mapa', 16) + '<span>Ver todos los spots</span>' });
+  const ocasiones = el('button', { class: 'ver-todos', onclick: () => { estado.ocasiones = true; pintarTodo(); irArriba(); },
+    html: svg('calendario', 16) + '<span>Próximas ocasiones</span>' });
   return [
     seccion('¿Cuándo?', botonesDias()),
+    datos.ocasiones && datos.ocasiones.length ? ocasiones : null,
     filas.length ? null : el('p', { class: 'vacio' }, 'No hay spots en esta parte del mapa.'),
     todos ? null : verTodos,
     filas.length ? seccion(lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
-      const sub = r.color === 'rojo' ? 'Nada destacable ese día'
+      const sub = r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
-      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' ? null : mejor.o) },
+      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' || r.color === 'pasado' ? null : mejor.o) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
@@ -556,7 +571,9 @@ function pintarMirador() {
 function cabezaMirador(m) {
   const [titulo, lugar] = partesNombre(m.nombre);
   return el('div', { class: 'cabeza-ficha' }, el('h2', {}, titulo),
-    el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · ')),
+    // La luz de ciudad solo importa para las estrellas (Aaron, 23-10-2026).
+    el('p', {}, [lugar, `${m.altitud} m`, estado.objetivo === 'Estrellas' ? `luz de ciudad: zona ${m.zona_luz}` : null]
+      .filter(Boolean).join(' · ')),
     // Muy canario y llama la atención (Aaron, 23-10-2026).
     m.teide != null ? el('span', { class: 'teide' }, el('span', { class: 'triangulo' }), 'Se ve el Teide') : null);
 }
@@ -571,7 +588,7 @@ function pintarResumen() {
       const r = resultado(estado.mirador, o);
       // Si no hay nota, el veredicto ya va en la pastilla: no repetirlo.
       const hora = o === 'Estrellas' && r.hora ? textoHora(o, r) : r.hora;
-      const sub = [r.puntos != null ? TITULO[r.color] : null, hora, r.marca].filter(Boolean).join(' · ');
+      const sub = [r.puntos != null && r.color !== 'pasado' ? TITULO[r.color] : null, hora, r.marca].filter(Boolean).join(' · ');
       const nubes = r.prob_nubes != null ? `${r.prob_nubes} % de nubes` : null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => { estado.objetivo = o; pintarTodo(); irArriba(); } },
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
@@ -680,6 +697,52 @@ async function compartirPlan(m, r, boton) {
     boton.querySelector('span').textContent = 'Enlace copiado';
     setTimeout(() => { boton.querySelector('span').textContent = 'Compartir'; }, 2500);
   } catch { /* cancelado */ }
+}
+
+// --- Próximas ocasiones (Aaron, 23-10-2026) ----------------------------------
+// Lo especial de los próximos meses (ocasiones.py): sin el tiempo, que solo
+// se sabe con 5 días. Las que caen en los días con datos se pueden abrir.
+const OBJETIVO_DE = { luna: 'Salida de luna', atardecer: 'Atardecer', amanecer: 'Amanecer', estrellas: 'Estrellas' };
+const fechaCorta = d => new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+
+function cuandoOcasion(o) {
+  if (!o.hasta) return [fechaCorta(o.fecha), o.hora].filter(Boolean).join(' · ');
+  const hasta = new Date(o.hasta + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  return o.fecha <= datos.dias[0] ? `Ya, hasta el ${hasta}` : `Del ${fechaCorta(o.fecha)} al ${hasta}`;
+}
+
+function iconoOcasion(tipo) {
+  if (tipo === 'luna') return el('span', { class: 'icono-obj', html: svg('Salida de luna', 20) });
+  if (tipo === 'oscuras') return el('span', { class: 'icono-obj', html: svg('Estrellas', 20) });
+  if (tipo === 'teide') return el('span', { class: 'icono-obj teide-icono' }, el('span', { class: 'triangulo' }));
+  return el('span', { class: 'icono-obj emoji' }, tipo === 'lluvia' ? '☄️' : '🌌');
+}
+
+function pintarOcasiones() {
+  const porMes = {};
+  for (const o of datos.ocasiones) {
+    const desde = o.fecha < datos.dias[0] ? datos.dias[0] : o.fecha;
+    const mes = new Date(desde + 'T12:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    (porMes[mes] = porMes[mes] || []).push(o);
+  }
+  return [
+    el('button', { class: 'volver', onclick: () => { estado.ocasiones = false; pintarTodo(); irArriba(); },
+      html: svg('volver', 18) + '<span>Hoy y próximos días</span>' }),
+    el('div', { class: 'cabeza-ficha' }, el('h2', {}, 'Próximas ocasiones'),
+      el('p', {}, 'Lo especial de los próximos meses en todos los spots. Sin contar el tiempo: las nubes se saben con unos 5 días.')),
+    ...Object.entries(porMes).map(([mes, lista]) => seccion(mayuscula(mes), el('ul', { class: 'lista' }, lista.map(o => {
+      // Abrible si alguno de sus días ya tiene datos.
+      const dia = datos.dias.find(d => d >= o.fecha && d <= (o.hasta || o.fecha));
+      const contenido = [iconoOcasion(o.tipo),
+        el('span', { class: 'texto' },
+          el('span', { class: 'titulo' }, o.titulo),
+          el('span', { class: 'sub' }, `${cuandoOcasion(o)} · ${partesNombre(datos.miradores[o.spot].nombre)[0]}`),
+          el('span', { class: 'sub explica-ocasion' }, o.texto + (dia ? '' : ' Aún sin previsión del tiempo.')))];
+      return el('li', {}, dia
+        ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
+        : el('div', { class: 'fila' }, ...contenido));
+    })))),
+  ];
 }
 
 function pintarDetalle() {
@@ -866,7 +929,8 @@ function pintarTodo() {
   // En el móvil, con un mirador abierto el panel sube más: la nota y Tu plan
   // se ven sin deslizar.
   document.getElementById('panel').classList.toggle('con-ficha', Boolean(estado.mirador));
-  document.getElementById('contenido').replaceChildren(...(estado.mirador ? pintarMirador() : pintarLista()));
+  document.getElementById('contenido').replaceChildren(...(estado.mirador ? pintarMirador()
+    : estado.ocasiones ? pintarOcasiones() : pintarLista()));
   guardarEnlace();
 }
 

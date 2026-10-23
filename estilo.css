@@ -290,3 +290,11 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .opcion-aviso span { color: var(--suave); font-size: 12.5px; }
 /* Lo que verás: el horizonte de frente, con el camino del astro. */
 .frente svg { width: 100%; height: auto; display: block; border-radius: 12px; font-family: 'Plus Jakarta Sans', sans-serif; }
+/* Próximas ocasiones. */
+.icono-obj.emoji { font-size: 19px; }
+.teide-icono { color: #3E4A35; }
+.fila .sub.explica-ocasion { white-space: normal; margin-top: 2px; }
+/* Lo de hoy que ya pasó: en gris. */
+.punto.pasado { background: #AAB4BF; }
+.pastilla.pasado { background: #E9EDF1; color: var(--suave); }
+.estado.pasado { background: #EEF1F4; }
