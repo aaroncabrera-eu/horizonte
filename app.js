@@ -969,6 +969,20 @@ function prepararSinConexion() {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(() => navigator.serviceWorker.ready)
     .then(reg => reg.active && reg.active.postMessage({ tipo: 'guardar-teselas', urls: teselasDeLosMiradores() }))
     .catch(() => { /* sin trabajador: la web sigue funcionando con red */ });
+  // Versión nueva publicada: el trabajador nuevo toma el mando y la página se
+  // recarga sola (si no, una pestaña abierta seguía con la vieja; Aaron,
+  // 24-10-2026). Al volver a la pestaña se mira si hay versión nueva.
+  const habiaTrabajador = Boolean(navigator.serviceWorker.controller);
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!habiaTrabajador || recargando) return;
+    recargando = true;
+    location.reload();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible')
+      navigator.serviceWorker.getRegistration().then(reg => reg && reg.update()).catch(() => {});
+  });
   // Al perder o recuperar la red, actualizar el aviso.
   addEventListener('online', pintarTodo);
   addEventListener('offline', pintarTodo);
