@@ -610,10 +610,11 @@ fetch('datos.json', { cache: 'no-cache' })
     // Tocar la barra del panel recogido lo vuelve a abrir.
     // Tocar el mapa (Aaron, 23-10-2026): con un mirador abierto, se
     // deselecciona y el panel vuelve a la lista (sin esconderse ni mover el
-    // mapa); sin mirador abierto, se esconde el panel.
+    // mapa); sin mirador abierto, en el móvil se esconde el panel. En el
+    // ordenador el panel solo se cierra con su botón.
     mapa.on('click', () => {
       if (estado.mirador) cerrarMirador(false);
-      else plegar(true);
+      else if (!esOrdenador()) plegar(true);
     });
     document.querySelector('.cabecera').addEventListener('click', () => {
       if (Date.now() - arrastrado < 400) return;      // era un deslizamiento, no un toque
