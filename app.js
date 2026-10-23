@@ -80,12 +80,17 @@ function resultado(clave, objetivo) {
   return datos.miradores[clave].dias[estado.dia][objetivo];
 }
 
-// Lo mejor que se puede ver en un mirador ese día: primero por color, luego
-// si tiene ⭐ o 🎨, y si empatan, en el orden de OBJETIVOS.
+// Orden de «mejor a peor»: color, luego la nota y, si empatan, ⭐ o 🎨.
+function comparar(a, b) {
+  return ORDEN[a.color] - ORDEN[b.color] || (b.puntos ?? 0) - (a.puntos ?? 0) ||
+         (b.marca ? 1 : 0) - (a.marca ? 1 : 0);
+}
+
+// Lo mejor que se puede ver en un mirador ese día (si empatan, en el orden
+// de OBJETIVOS).
 function mejorObjetivo(clave) {
   return OBJETIVOS.map((o, i) => ({ o, i, r: resultado(clave, o) }))
-    .sort((a, b) => ORDEN[a.r.color] - ORDEN[b.r.color] ||
-                    (b.r.marca ? 1 : 0) - (a.r.marca ? 1 : 0) || a.i - b.i)[0];
+    .sort((a, b) => comparar(a.r, b.r) || a.i - b.i)[0];
 }
 
 // --- Enlace: #mirador/fecha/objetivo -----------------------------------------
@@ -205,6 +210,17 @@ function sinTiempo() {
   return datos.sin_tiempo ? el('strong', { class: 'sin-tiempo' }, ' Ojo: esta vez no se pudo consultar la previsión del tiempo; las notas suponen el cielo despejado.') : null;
 }
 
+// Con el mapa lejos (zoom < ZOOM_CERCA) la lista no se mueve: todos, de
+// mejor a peor; si no, cualquier roce del mapa la reordenaría (Aaron,
+// 23-10-2026). Al acercarse, solo los que se ven, del más cercano al centro.
+const ZOOM_CERCA = 11;
+
+function mejoresPrimero() {
+  return Object.keys(datos.miradores)
+    .map(clave => ({ clave, mejor: mejorObjetivo(clave) }))
+    .sort((a, b) => comparar(a.mejor.r, b.mejor.r));
+}
+
 // Miradores que se ven en la parte del mapa que no tapa el panel, del más
 // cercano al más lejano al centro de esa parte (Aaron, 23-10-2026).
 function miradoresALaVista() {
@@ -226,15 +242,16 @@ function refrescarLista() {
 }
 
 function pintarLista() {
-  const filas = miradoresALaVista();
-  const todos = filas.length === Object.keys(datos.miradores).length;
+  const lejos = mapa.getZoom() < ZOOM_CERCA;
+  const filas = lejos ? mejoresPrimero() : miradoresALaVista();
+  const todos = lejos || filas.length === Object.keys(datos.miradores).length;
   const verTodos = el('button', { class: 'ver-todos', onclick: verTenerife,
     html: svg('mapa', 16) + '<span>Ver todos los miradores</span>' });
   return [
     seccion('¿Cuándo?', botonesDias()),
     filas.length ? null : el('p', { class: 'vacio' }, 'No hay miradores en esta parte del mapa.'),
     todos ? null : verTodos,
-    filas.length ? seccion('En el mapa, del más cercano al centro', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
+    filas.length ? seccion(lejos ? 'Lo mejor de cada mirador' : 'En el mapa, del más cercano al centro', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
