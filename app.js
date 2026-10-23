@@ -21,6 +21,9 @@ const ICONOS = {
   volver: '<path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/>',
   abajo: '<path d="M6 9l6 6 6-6"/>',
   mapa: '<path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5"/><path d="M15 6.5V20"/>',
+  ruta: '<path d="M12 21s-6-5.6-6-10.5A6 6 0 0 1 18 10.5C18 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.2"/>',
+  campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  compartir: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
 };
 function svg(nombre, tam = 20) {
   return `<svg aria-hidden="true" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONOS[nombre]}</svg>`;
@@ -468,6 +471,83 @@ function pintarResumen() {
   ];
 }
 
+// --- Cómo llegar, Avísame y Compartir (Aaron, 23-10-2026) -------------------
+function acciones(m, r) {
+  const nombre = partesNombre(m.nombre)[0];
+  const llegar = el('a', { class: 'accion', target: '_blank', rel: 'noopener',
+    href: `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`,
+    html: svg('ruta', 18) + '<span>Cómo llegar</span>' });
+  const avisar = r.hora ? el('button', { class: 'accion', html: svg('campana', 18) + '<span>Avísame</span>',
+    onclick: () => descargarAviso(m, r) }) : null;
+  const compartir = el('button', { class: 'accion', html: svg('compartir', 18) + '<span>Compartir</span>',
+    onclick: () => compartirPlan(m, r, compartir) });
+  return el('div', { class: 'acciones' }, llegar, avisar, compartir);
+}
+
+const fechaLarga = dia => new Date(dia + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+// Hora de Canarias (HH:MM de ese día) → instante real. Canarias va con UTC en
+// invierno y UTC+1 en verano: se pregunta al navegador qué toca ese día.
+function instante(dia, hhmm) {
+  const [a, mes, d] = dia.split('-').map(Number), [h, mi] = hhmm.split(':').map(Number);
+  const aprox = new Date(Date.UTC(a, mes - 1, d, h, mi));
+  let desfase = 0;
+  try {
+    const zona = new Intl.DateTimeFormat('en', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' })
+      .formatToParts(aprox).find(p => p.type === 'timeZoneName').value;      // "GMT+1" o "GMT"
+    desfase = Number((zona.match(/[+-]\d+/) || ['0'])[0]);
+  } catch { /* navegador viejo: hora de invierno */ }
+  return new Date(aprox.getTime() - desfase * 3600e3);
+}
+
+// Un evento de calendario (.ics) con alarma una hora antes. El móvil lo abre
+// con su calendario; no hace falta servidor ni cuenta.
+function descargarAviso(m, r) {
+  const nombre = partesNombre(m.nombre)[0];
+  const [ini, fin] = r.hora.split('-');
+  let desde, hasta;
+  if (fin) {                       // estrellas: el rato de noche (acaba al día siguiente)
+    desde = instante(estado.dia, ini);
+    hasta = instante(estado.dia, fin);
+    if (hasta <= desde) hasta = new Date(hasta.getTime() + 86400e3);
+  } else {                         // sol o luna: llegar media hora antes y quedarse otra media
+    const t = instante(estado.dia, ini);
+    desde = new Date(t.getTime() - 30 * 60e3);
+    hasta = new Date(t.getTime() + 30 * 60e3);
+  }
+  const utc = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  // En los .ics, comas, puntos y coma y saltos de línea van escapados.
+  const txt = s => s.replace(/\\/g, '\\\\').replace(/[,;]/g, c => '\\' + c).replace(/\n/g, '\\n');
+  const titulo = `${CORTO[estado.objetivo] || estado.objetivo} en ${nombre}`;
+  const notaTxt = r.puntos != null ? ` (${coma(r.puntos)}/10)` : '';
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Horizonte//ES', 'BEGIN:VEVENT',
+    `UID:${estado.mirador}-${estado.dia}-${EN_ENLACE[estado.objetivo]}@horizonte`,
+    `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(desde)}`, `DTEND:${utc(hasta)}`,
+    `SUMMARY:${txt(titulo)}`, `LOCATION:${txt(nombre)}`, `GEO:${m.lat};${m.lon}`,
+    `DESCRIPTION:${txt(`${TITULO[r.color]}${notaTxt}. ${textoHora(estado.objetivo, r)}.\n${location.href}`)}`,
+    `URL:${location.href}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT60M', `DESCRIPTION:${txt(titulo + ': sal en un rato')}`, 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const enlace = el('a', { href: URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })),
+    download: `horizonte-${estado.mirador}-${estado.dia}.ics` });
+  document.body.append(enlace);
+  enlace.click();
+  enlace.remove();
+}
+
+// Compartir por WhatsApp y demás (el menú del móvil); si no hay, se copia.
+async function compartirPlan(m, r, boton) {
+  const nombre = partesNombre(m.nombre)[0];
+  const texto = `${CORTO[estado.objetivo] || estado.objetivo} en ${nombre}, ${fechaLarga(estado.dia)}: ` +
+    `${TITULO[r.color].toLowerCase()}${r.puntos != null ? ` (${coma(r.puntos)}/10)` : ''}. ${textoHora(estado.objetivo, r)}.`;
+  try {
+    if (navigator.share) return await navigator.share({ title: 'Horizonte', text: texto, url: location.href });
+    await navigator.clipboard.writeText(`${texto} ${location.href}`);
+    boton.querySelector('span').textContent = 'Enlace copiado';
+    setTimeout(() => { boton.querySelector('span').textContent = 'Compartir'; }, 2500);
+  } catch { /* cancelado */ }
+}
+
 function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
   const r = resultado(estado.mirador, estado.objetivo);
@@ -494,6 +574,8 @@ function pintarDetalle() {
     datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }), el('span', {}, 'Teide despejado')));
   if ((r.desglose || []).some(d => d.factor === 'Mar de nubes debajo'))
     datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + '<span>Mar de nubes debajo</span>' }));
+  const lluvia = (r.desglose || []).find(d => d.factor === 'Lluvia de estrellas');
+  if (lluvia) datosEstado.push(el('span', { class: 'dato ideal' }, `☄️ ${lluvia.texto.split(' (')[0]}`));
   if (r.marca === '🎨') datosEstado.push(el('span', { class: 'dato ideal', html: svg('paleta', 15) + '<span>El cielo puede encenderse</span>' }));
   partes.push(el('div', { class: `estado ${r.color}` },
     el('div', { class: 'fila-estado' },
@@ -501,6 +583,7 @@ function pintarDetalle() {
         el('span', { class: 'hora' }, textoHora(estado.objetivo, r))),
       r.puntos != null ? el('div', { class: 'nota-puntos' }, el('strong', {}, coma(r.puntos)), el('span', {}, 'de 10')) : null),
     datosEstado.length ? el('div', { class: 'datos-estado' }, datosEstado) : null));
+  partes.push(acciones(m, r));
 
   if (r.momentos && r.momentos.length) {
     partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Tu plan'),

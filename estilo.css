@@ -270,3 +270,11 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .triangulo { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid currentColor; flex-shrink: 0; }
 .teide { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 4px 10px 4px 8px; border-radius: 999px; background: #E6ECDF; color: #3E4A35; font-size: 13px; font-weight: 700; }
 .teide-dato { color: #3E4A35; }
+/* Cómo llegar, Avísame, Compartir: tres botones iguales bajo la nota. */
+.acciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.accion {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 60px; padding: 8px 4px; border-radius: 14px; border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--primario); font-size: 13px; font-weight: 700; text-decoration: none;
+}
+.accion:active { background: var(--primario-claro); }
