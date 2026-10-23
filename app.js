@@ -130,17 +130,23 @@ const ZOOM_NOMBRES = 12;
 
 function iniciarMapa() {
   mapa = L.map('mapa', { zoomControl: false, attributionControl: true });
-  // Relieve y callejero algo apagados (clase fondo-suave) para que no choquen.
+  // Relieve algo apagado (clase fondo-suave) para que no choquen.
   const relieve = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17, className: 'fondo-suave', attribution: '© OpenStreetMap, SRTM · © OpenTopoMap (CC-BY-SA)' });
-  // OpenStreetMap: gratis y sin clave (CARTO empezó a pedir una).
-  const callejero = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, className: 'fondo-suave', attribution: '© colaboradores de OpenStreetMap' });
+  // Simple: el lienzo gris claro de Esri (gratis y sin clave; CARTO pide una
+  // desde 2026), con los nombres en una capa aparte. La clase fondo-simple lo
+  // tiñe con los colores del panel.
+  const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  const simple = L.layerGroup([
+    L.tileLayer(esri + 'World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16, className: 'fondo-simple', attribution: 'Mapa © Esri, HERE, Garmin, © OpenStreetMap' }),
+    L.tileLayer(esri + 'World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }),
+  ]);
   const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
-  relieve.addTo(mapa);
+  simple.addTo(mapa);
   // Tipo de mapa y zoom a la izquierda (el panel va a la derecha), en fila.
-  L.control.layers({ 'Relieve': relieve, 'Callejero': callejero, 'Satélite': satelite },
+  L.control.layers({ 'Simple': simple, 'Relieve': relieve, 'Satélite': satelite },
     null, { position: 'topleft', collapsed: false }).addTo(mapa);
   L.control.zoom({ position: 'topleft', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(mapa);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa);
@@ -304,7 +310,8 @@ function pintarRueda(m, azimut) {
     ${localizador}</svg>`;
 }
 
-// Al mover el dedo o el ratón por la rueda: qué hay en esa dirección.
+// Al tocar la rueda (o pasar el ratón): qué hay en esa dirección. En el móvil
+// solo con un toque, para que deslizar el dedo encima siga moviendo el panel.
 function conectarRueda(dibujo, lectura, m) {
   const mover = ev => {
     const caja = dibujo.querySelector('svg').getBoundingClientRect();
@@ -320,8 +327,8 @@ function conectarRueda(dibujo, lectura, m) {
       : `${m.delante[az]}, a ${km < 10 ? coma(km.toFixed(1)) : Math.round(km)} km`;
     lectura.textContent = `${az}° ${rumbo(az)} · ${que} · ${h >= 0 ? '+' : ''}${coma(h.toFixed(1))}°`;
   };
-  dibujo.addEventListener('pointermove', mover);
-  dibujo.addEventListener('pointerdown', mover);
+  dibujo.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse') mover(ev); });
+  dibujo.addEventListener('click', mover);
 }
 
 // --- Vista mirador: elegir qué ver y el plan ---------------------------------
@@ -367,7 +374,7 @@ function pintarMirador() {
   }
 
   const dibujo = el('div', { class: 'dibujo', html: pintarRueda(m, r.azimut) });
-  const lectura = el('p', { class: 'lectura', 'aria-live': 'polite' }, 'Pasa el dedo alrededor de la rueda para ver qué hay en cada dirección.');
+  const lectura = el('p', { class: 'lectura', 'aria-live': 'polite' }, 'Toca alrededor de la rueda para ver qué hay en cada dirección.');
   conectarRueda(dibujo, lectura, m);
   partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Su horizonte: tú en el centro'), dibujo, lectura,
     el('p', { class: 'nota' }, 'Visto desde arriba, con el norte arriba como en el mapa. ' +
