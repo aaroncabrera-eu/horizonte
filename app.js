@@ -407,20 +407,23 @@ function cerrarMirador() {
 
 // Esconder el panel para ver el mapa entero (y volver a sacarlo).
 // Deslizar el panel con el dedo (móvil), arrastrando su barra de arriba:
-// hacia arriba crece hasta casi toda la pantalla; hacia abajo vuelve al
-// tamaño normal o se recoge. Al soltar se queda en la posición más cercana.
+// manda la dirección del gesto, no dónde se suelta (Aaron, 23-10-2026): hacia
+// abajo baja un escalón (grande → normal → recogido) y hacia arriba sube uno.
 let arrastrado = 0;     // cuándo acabó el último arrastre (para no tomarlo por un toque)
 
 function conectarDeslizar() {
   const panel = document.getElementById('panel'), barra = panel.querySelector('.cabecera');
-  let inicioY = null, inicioAlto = 0, movido = false;
+  let inicioY = null, inicioAlto = 0, movido = false, ultimoY = 0, desde = 'normal';
   barra.addEventListener('pointerdown', e => {
     if (esOrdenador()) return;
-    inicioY = e.clientY; inicioAlto = panel.offsetHeight; movido = false;
+    inicioY = ultimoY = e.clientY; inicioAlto = panel.offsetHeight; movido = false;
+    desde = panel.classList.contains('plegado') ? 'plegado'
+      : panel.classList.contains('grande') ? 'grande' : 'normal';
   });
   barra.addEventListener('pointermove', e => {
     if (inicioY === null) return;
     const dy = e.clientY - inicioY;
+    ultimoY = e.clientY;
     if (!movido && Math.abs(dy) < 8) return;       // aún puede ser un toque
     if (!movido) {
       movido = true;
@@ -434,6 +437,7 @@ function conectarDeslizar() {
   });
   const soltar = () => {
     if (inicioY === null) return;
+    const abajo = ultimoY > inicioY;     // antes de olvidar dónde empezó
     inicioY = null;
     if (!movido) return;
     arrastrado = Date.now();
@@ -441,11 +445,12 @@ function conectarDeslizar() {
     const normal = pantalla * (panel.classList.contains('con-ficha') ? 0.72 : 0.48);
     panel.classList.remove('arrastrando');
     panel.style.maxHeight = panel.style.height = '';
-    if (alto < pantalla * 0.25) plegar(true);
-    else {
-      plegar(false);
-      panel.classList.toggle('grande', alto > (normal + pantalla * 0.92) / 2);
-    }
+    // Si desde grande lo bajas por debajo del tamaño normal, se recoge del todo.
+    const destino = abajo
+      ? (desde === 'grande' && alto > normal * 0.8 ? 'normal' : 'plegado')
+      : (desde === 'plegado' && alto < (normal + pantalla * 0.92) / 2 ? 'normal' : 'grande');
+    plegar(destino === 'plegado');
+    panel.classList.toggle('grande', destino === 'grande');
   };
   barra.addEventListener('pointerup', soltar);
   barra.addEventListener('pointercancel', soltar);
