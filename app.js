@@ -347,6 +347,25 @@ function conectarRueda(dibujo, lectura, m, azInicial) {
   ponerEn(Math.round(azInicial ?? 0) % 360);
 }
 
+// Un número con una cifra decimal como mucho y coma: 5.5 → "5,5", 3 → "3".
+const num = n => coma(Math.round(n * 10) / 10);
+// Decimales con coma también dentro de los textos: "0.64" → "0,64".
+const comas = texto => texto.replace(/(\d)\.(\d)/g, '$1,$2');
+
+function tablaNota(r) {
+  const fila = (izq, der, clase = '') => el('div', { class: `fila-nota ${clase}` }, izq, el('span', { class: 'cifra' }, der));
+  const factor = (nombre, texto) => el('span', {}, el('strong', {}, nombre), texto ? el('span', { class: 'explica' }, comas(mayuscula(texto))) : null);
+  const libre = r.prob_nubes != null ? (100 - r.prob_nubes) / 100 : null;
+  return el('div', { class: 'tabla-nota' },
+    el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`),
+    r.desglose.map(d => fila(factor(d.factor, d.texto), d.max != null ? `${num(d.puntos)} / ${d.max}` : num(d.puntos))),
+    fila(factor('Con el cielo despejado'), `${num(r.calidad)} / 10`, 'subtotal'),
+    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${estado.objetivo === 'Salida de luna' ? 'la' : 'lo'} tapen` : 'aún no se pueden prever'),
+      libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
+    fila(factor('Nota final'), `${num(r.puntos)} / 10`, 'total'),
+    (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
+}
+
 // --- Vista mirador: resumen con las cuatro opciones o detalle de una ----------
 // (Aaron, 23-10-2026): al abrir un mirador, primero las cuatro tarjetas con
 // su nota; al tocar una, su pantalla con todo (y «← mirador» para volver).
@@ -420,15 +439,18 @@ function pintarDetalle() {
   const lectura = el('p', { class: 'lectura', 'aria-live': 'polite' });
   conectarRueda(dibujo, lectura, m, r.azimut);
   partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Su horizonte: tú en el centro'), dibujo, lectura,
-    el('p', { class: 'ayuda-rueda' }, 'Arrastra la bolita (o toca la rueda) para ver qué hay en cada dirección.'),
+    el('p', { class: 'ayuda-rueda' }, 'Arrastra la bolita para ver qué hay en cada dirección.'),
     el('p', { class: 'nota' }, 'Visto desde arriba, con el norte arriba como en el mapa. ' +
       (r.azimut != null ? `La flecha marca hacia dónde ${VERBO[estado.objetivo]} (${rumbo(r.azimut)}). ` : '') +
       'El círculo discontinuo es la horizontal: el verde que sobresale es relieve que te tapa; el azul, el mar. Alturas exageradas.')));
 
-  const lista = el('ul', { class: 'porque', hidden: '' }, r.porque.map(t => el('li', {}, mayuscula(t))));
+  // ¿Cómo se calcula la nota? (Aaron, 23-10-2026): tabla con los puntos de
+  // cada factor; sin nota (estrellas o si no se ve), las frases de siempre.
+  const lista = r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
+  lista.hidden = true;
   const boton = el('button', { class: 'boton', 'aria-expanded': 'false', onclick: () => {
     const abrir = lista.hidden; lista.hidden = !abrir; boton.setAttribute('aria-expanded', String(abrir));
-  }, html: '<span>¿Por qué?</span>' + svg('abajo', 18) });
+  }, html: '<span>¿Cómo se calcula la nota?</span>' + svg('abajo', 18) });
   partes.push(el('div', { class: 'caja' }, boton, lista));
 
   const alternativas = [];

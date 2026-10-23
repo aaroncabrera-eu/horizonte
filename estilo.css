@@ -247,3 +247,14 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .cabeza-ficha h2 { display: flex; align-items: center; gap: 8px; }
 .cabeza-ficha h2 svg { color: var(--primario); flex-shrink: 0; }
 .ayuda-rueda { margin: 2px 0 0; font-size: 12px; color: var(--suave); text-align: center; }
+/* ¿Cómo se calcula la nota?: una fila por factor con sus puntos a la derecha. */
+.tabla-nota[hidden] { display: none; }
+.tabla-nota { display: flex; flex-direction: column; margin-top: 8px; font-size: 14px; }
+.tabla-nota .delante { margin: 0 0 6px; color: var(--suave); font-size: 13px; }
+.fila-nota { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid var(--borde); }
+.fila-nota > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fila-nota .explica { font-size: 12.5px; color: var(--suave); line-height: 1.4; }
+.fila-nota .cifra { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fila-nota.subtotal { border-top: 2px solid var(--borde); }
+.fila-nota.total { border-top: 2px solid var(--texto); }
+.fila-nota.total strong, .fila-nota.total .cifra { font-size: 16px; }
