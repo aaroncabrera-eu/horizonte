@@ -504,11 +504,12 @@ fetch('datos.json', { cache: 'no-cache' })
       plegar(!document.getElementById('panel').classList.contains('plegado'));
     });
     // Tocar la barra del panel recogido lo vuelve a abrir.
-    // Tocar el mapa (Aaron, 23-10-2026): se cierra el panel y, si había un
-    // mirador abierto, se deselecciona; el mapa se queda donde estaba.
+    // Tocar el mapa (Aaron, 23-10-2026): con un mirador abierto, se
+    // deselecciona y el panel vuelve a la lista (sin esconderse ni mover el
+    // mapa); sin mirador abierto, se esconde el panel.
     mapa.on('click', () => {
-      plegar(true);
       if (estado.mirador) cerrarMirador(false);
+      else plegar(true);
     });
     document.querySelector('.cabecera').addEventListener('click', () => {
       if (Date.now() - arrastrado < 400) return;      // era un deslizamiento, no un toque
