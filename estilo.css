@@ -300,3 +300,34 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .nota-seccion { margin: -2px 0 2px; font-size: 13px; color: var(--suave); }
 .separador-ocasiones { margin: 8px 0 0; padding-top: 14px; border-top: 1px solid var(--borde); font-size: 13px; color: var(--suave); }
 .fila.sin-prevision { background: transparent; }
+/* Botón «?» junto a «Ver mapa». */
+.botones-cabecera { display: flex; gap: 8px; }
+.ayuda-boton { width: 36px; padding: 0; font-size: 16px; }
+/* Cómo funciona: tarjeta centrada sobre un fondo oscuro. */
+.ayuda-fondo {
+  position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(19, 32, 46, .45);
+}
+.ayuda-caja {
+  width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 10px;
+  padding: 22px 20px 18px; border-radius: 22px; background: var(--fondo); box-shadow: var(--sombra);
+}
+.ayuda-icono {
+  width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--primario-claro); color: var(--primario);
+}
+.ayuda-caja h2 { margin: 4px 0 0; font-size: 22px; }
+.ayuda-caja p { margin: 0; line-height: 1.5; }
+.ayuda-pie { color: var(--suave); font-size: 14px; }
+.ayuda-colores { display: flex; flex-wrap: wrap; gap: 6px; }
+.ayuda-pasos { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
+.ayuda-pasos span { width: 7px; height: 7px; border-radius: 4px; background: #C3CCD5; }
+.ayuda-pasos span.activo { width: 20px; background: var(--primario); }
+.ayuda-botones { display: flex; justify-content: flex-end; gap: 8px; }
+.ayuda-botones button { min-height: 42px; padding: 0 18px; border-radius: 12px; border: none; font-weight: 700; font-size: 15px; }
+.ayuda-saltar { background: transparent; color: var(--suave); }
+.ayuda-siguiente { background: var(--primario); color: #fff; }
+/* Seguridad de la previsión. */
+.dato.seguridad.segura { color: var(--verde); }
+.dato.seguridad.media { color: var(--amarillo); }
+.dato.seguridad.floja { color: var(--rojo); }

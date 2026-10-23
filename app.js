@@ -759,6 +759,20 @@ function pintarOcasiones() {
   ].filter(Boolean);
 }
 
+// Cuánto fiarse de la previsión (Aaron, 24-10-2026): por ahora, según los
+// días que faltan (cuanto más lejos, más puede cambiar). Más adelante se
+// podrá afinar mirando si varios modelos del tiempo coinciden.
+function hoyCanarias() {
+  try { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Atlantic/Canary' }); }   // AAAA-MM-DD
+  catch { return datos.dias[0]; }
+}
+function seguridad(dia) {
+  const faltan = Math.round((new Date(dia + 'T12:00') - new Date(hoyCanarias() + 'T12:00')) / 86400e3);
+  if (faltan <= 1) return ['segura', 'Previsión bastante segura'];
+  if (faltan <= 3) return ['media', 'Previsión: puede cambiar algo'];
+  return ['floja', 'Previsión: puede cambiar bastante, revísala antes de ir'];
+}
+
 function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
   const r = resultado(estado.mirador, estado.objetivo);
@@ -781,6 +795,10 @@ function pintarDetalle() {
   // Tarjeta del estado: veredicto, hora, nota y datos clave.
   const datosEstado = [];
   if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que las nubes ${TAPAN[estado.objetivo]}</span>` }));
+  if (r.prob_nubes != null && r.color !== 'pasado') {
+    const [clase, texto] = seguridad(estado.dia);
+    datosEstado.push(el('span', { class: `dato seguridad ${clase}`, html: svg('reloj', 15) + `<span>${texto}</span>` }));
+  }
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
   // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
   if ((r.desglose || []).some(d => d.factor === 'Paisaje' && d.texto.includes('Teide')))
@@ -953,6 +971,54 @@ function pintarTodo() {
   guardarEnlace();
 }
 
+// --- Cómo funciona (Aaron, 24-10-2026) ---------------------------------------
+// Cuatro pantallas cortas la primera vez que se abre la web; luego, con el
+// botón «?» de arriba. Se recuerda en este navegador que ya se vio.
+const AYUDA = [
+  { icono: 'Atardecer', titulo: '¿Merece la pena ir?',
+    texto: 'Horizonte te dice, para hoy y los próximos días, si merece la pena ir a cada spot de Tenerife a ver la salida de la luna, el atardecer, el amanecer o las estrellas.',
+    puntos: [['verde', 'Merece la pena'], ['amarillo', 'Regular'], ['rojo', 'No merece la pena']],
+    pie: 'Cada opción tiene una nota de 0 a 10. Elige el día arriba: la lista te enseña lo mejor de cada spot, de mejor a peor.' },
+  { icono: 'mapa', titulo: 'Toca un spot',
+    texto: 'En el mapa o en la lista. Verás sus cuatro opciones con su nota; toca una para ver el plan: a qué hora ir, qué pasará y una nota para hacer la foto con el móvil.',
+    pie: '«Avísame» lo apunta en tu calendario, «Cómo llegar» abre la ruta y «Compartir» lo manda por WhatsApp.' },
+  { icono: 'ruta', titulo: 'Lo que verás',
+    texto: 'Un dibujo del horizonte de frente, como por la cámara: por dónde saldrá o se pondrá el sol o la luna cada 5 minutos, las nubes que da la previsión y la calima.',
+    pie: 'Debajo, la rueda: todo tu horizonte visto desde arriba, con lo que tapa cada dirección (arrastra la bolita).' },
+  { icono: 'nube', titulo: 'De dónde sale la nota',
+    texto: 'Del sitio (el mar o una montaña delante, el paisaje, la oscuridad del cielo…) y del tiempo: las nubes y la calima de la previsión, que solo es fiable unos 5 días.',
+    pie: 'Para más adelante, mira «Próximas ocasiones»: lunas llenas, lluvias de estrellas, la Vía Láctea… Instálala en el móvil: funciona sin cobertura.' },
+];
+const AYUDA_VISTA = 'horizonte-ayuda-vista';
+
+function mostrarAyuda(paso = 0) {
+  document.querySelector('.ayuda-fondo')?.remove();
+  const p = AYUDA[paso], ultimo = paso === AYUDA.length - 1;
+  const cerrar = () => {
+    fondo.remove();
+    try { localStorage.setItem(AYUDA_VISTA, '1'); } catch { /* sin almacenamiento: se volverá a ver */ }
+  };
+  const fondo = el('div', { class: 'ayuda-fondo', onclick: e => { if (e.target === fondo) cerrar(); } },
+    el('div', { class: 'ayuda-caja', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Cómo funciona' },
+      el('span', { class: 'ayuda-icono', html: svg(p.icono, 28) }),
+      el('h2', {}, p.titulo),
+      el('p', {}, p.texto),
+      p.puntos ? el('div', { class: 'ayuda-colores' }, p.puntos.map(([c, t]) => el('span', { class: `pastilla ${c}` }, t))) : null,
+      el('p', { class: 'ayuda-pie' }, p.pie),
+      el('div', { class: 'ayuda-pasos' }, AYUDA.map((_, i) => el('span', { class: i === paso ? 'activo' : '' }))),
+      el('div', { class: 'ayuda-botones' },
+        ultimo ? null : el('button', { class: 'ayuda-saltar', onclick: cerrar }, 'Saltar'),
+        el('button', { class: 'ayuda-siguiente', onclick: () => ultimo ? cerrar() : mostrarAyuda(paso + 1) },
+          ultimo ? 'Empezar' : 'Siguiente'))));
+  document.body.append(fondo);
+}
+
+function ayudaPrimeraVez() {
+  let vista = false;
+  try { vista = localStorage.getItem(AYUDA_VISTA) === '1'; } catch { /* sin almacenamiento */ }
+  if (!vista) mostrarAyuda();
+}
+
 // --- Sin conexión (punto 4, 23-10-2026) --------------------------------------
 // El trabajador (sw.js) guarda la web, los datos y el mapa visto. Además le
 // pedimos el mapa de relieve alrededor de cada mirador (zoom 12 a 14), para
@@ -1006,6 +1072,7 @@ fetch('datos.json', { cache: 'no-cache' })
     estado.dia = datos.dias[0];
     leerEnlace();
     iniciarMapa();
+    document.getElementById('ayuda').addEventListener('click', e => { e.stopPropagation(); mostrarAyuda(); });
     document.getElementById('plegar').addEventListener('click', e => {
       e.stopPropagation();
       plegar(!document.getElementById('panel').classList.contains('plegado'));
@@ -1026,6 +1093,7 @@ fetch('datos.json', { cache: 'no-cache' })
     });
     conectarDeslizar();
     pintarTodo();
+    ayudaPrimeraVez();
     prepararSinConexion();
     if (estado.mirador) {
       const m = datos.miradores[estado.mirador];
