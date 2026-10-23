@@ -133,20 +133,11 @@ function iniciarMapa() {
   // Relieve algo apagado (clase fondo-suave) para que no choquen.
   const relieve = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17, className: 'fondo-suave', attribution: '© OpenStreetMap, SRTM · © OpenTopoMap (CC-BY-SA)' });
-  // Simple: el lienzo gris claro de Esri (gratis y sin clave; CARTO pide una
-  // desde 2026), con los nombres en una capa aparte. La clase fondo-simple lo
-  // tiñe con los colores del panel.
-  const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
-  const simple = L.layerGroup([
-    L.tileLayer(esri + 'World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 16, className: 'fondo-simple', attribution: 'Mapa © Esri, HERE, Garmin, © OpenStreetMap' }),
-    L.tileLayer(esri + 'World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }),
-  ]);
   const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
-  simple.addTo(mapa);
+  relieve.addTo(mapa);
   // Tipo de mapa y zoom a la izquierda (el panel va a la derecha), en fila.
-  L.control.layers({ 'Simple': simple, 'Relieve': relieve, 'Satélite': satelite },
+  L.control.layers({ 'Relieve': relieve, 'Satélite': satelite },
     null, { position: 'topleft', collapsed: false }).addTo(mapa);
   L.control.zoom({ position: 'topleft', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(mapa);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(mapa);
@@ -306,29 +297,48 @@ function pintarRueda(m, azimut) {
     <circle cx="${C}" cy="${C}" r="${DENTRO}" fill="#F4F6F8" stroke="#DCE2E8"/>
     <circle cx="${C}" cy="${C}" r="${HORIZONTAL}" fill="none" stroke="#13202E" stroke-width="1.2" stroke-dasharray="4 4"/>
     ${letras}${flecha}
-    <line class="cursor" x1="${C}" y1="${C}" x2="${C}" y2="${C}" stroke="#13202E" stroke-width="1.5" visibility="hidden"/>
+    <g class="cursor" visibility="hidden">
+      <line class="linea" x1="${C}" y1="${C}" x2="${C}" y2="${C}" stroke="#13202E" stroke-width="1.5"/>
+      <circle class="bola" cx="${C}" cy="${C}" r="8" fill="#13202E" stroke="#fff" stroke-width="2"/>
+      <line class="agarre" x1="${C}" y1="${C}" x2="${C}" y2="${C}" stroke="transparent" stroke-width="40" stroke-linecap="round"/>
+    </g>
     ${localizador}</svg>`;
 }
 
-// Al tocar la rueda (o pasar el ratón): qué hay en esa dirección. En el móvil
-// solo con un toque, para que deslizar el dedo encima siga moviendo el panel.
+// Al tocar la rueda (o pasar el ratón): qué hay en esa dirección. En el móvil,
+// un toque coloca la línea y luego se puede arrastrar cogiéndola (Aaron,
+// 23-10-2026); deslizar por el resto de la rueda sigue moviendo el panel.
 function conectarRueda(dibujo, lectura, m) {
   const mover = ev => {
     const caja = dibujo.querySelector('svg').getBoundingClientRect();
     const dx = ev.clientX - (caja.left + caja.width / 2), dy = ev.clientY - (caja.top + caja.height / 2);
     if (Math.hypot(dx, dy) < caja.width * 0.1) return;      // encima de ti: sin dirección
     const az = (Math.round(Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
-    const [x, y] = punto(az, 176);
+    const [x, y] = punto(az, 166);
     const cursor = dibujo.querySelector('.cursor');
-    cursor.setAttribute('x2', x); cursor.setAttribute('y2', y);
+    for (const linea of cursor.querySelectorAll('line')) { linea.setAttribute('x2', x); linea.setAttribute('y2', y); }
+    cursor.querySelector('.bola').setAttribute('cx', x);
+    cursor.querySelector('.bola').setAttribute('cy', y);
     cursor.setAttribute('visibility', 'visible');
     const h = m.horizonte[az], km = m.distancia[az];
     const que = m.delante[az] === 'mar abierto' ? `mar abierto (horizonte del mar a ${Math.round(km)} km)`
       : `${m.delante[az]}, a ${km < 10 ? coma(km.toFixed(1)) : Math.round(km)} km`;
     lectura.textContent = `${az}° ${rumbo(az)} · ${que} · ${h >= 0 ? '+' : ''}${coma(h.toFixed(1))}°`;
   };
-  dibujo.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse') mover(ev); });
+  let arrastrando = false;
+  dibujo.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse' || arrastrando) mover(ev); });
   dibujo.addEventListener('click', mover);
+  // Coger la línea: la zona gruesa invisible (agarre) no deja que el dedo
+  // mueva el panel mientras se arrastra.
+  const agarre = dibujo.querySelector('.agarre');
+  agarre.addEventListener('pointerdown', ev => {
+    arrastrando = true;
+    try { agarre.setPointerCapture(ev.pointerId); } catch { /* puntero ya suelto */ }
+  });
+  agarre.addEventListener('touchstart', ev => ev.preventDefault(), { passive: false });   // Safari
+  const soltar = () => { arrastrando = false; };
+  agarre.addEventListener('pointerup', soltar);
+  agarre.addEventListener('pointercancel', soltar);
 }
 
 // --- Vista mirador: elegir qué ver y el plan ---------------------------------

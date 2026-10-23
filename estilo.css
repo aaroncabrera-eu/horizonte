@@ -30,10 +30,13 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 
 /* --- Mapa ------------------------------------------------------------------ */
 .mapa { position: fixed; inset: 0; z-index: 0; background: #cfdde8; font-family: inherit; }
-/* Fondo Simple: el gris de Esri teñido con un toque azul, a juego con el panel. */
-.fondo-simple { filter: sepia(.3) hue-rotate(170deg) saturate(1.3) brightness(.97); }
 /* El relieve, algo apagado para que no choquen con el panel. */
 .fondo-suave { filter: saturate(.55) brightness(1.04) contrast(.95); }
+/* Con la isla entera (sin ampliar) el relieve se tiñe de azul, a juego con la
+   web (Aaron, 23-10-2026); al acercarse (clase con-nombres) recupera sus colores. */
+.leaflet-container:not(.con-nombres) .fondo-suave {
+  filter: grayscale(1) sepia(.6) hue-rotate(170deg) saturate(2.4) brightness(1.3) contrast(.72);
+}
 
 /* Controles de Leaflet con el mismo aspecto que el panel. */
 .leaflet-top.leaflet-left { display: flex; flex-direction: row; align-items: flex-start; }
@@ -236,6 +239,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .alternativa { line-height: 1.45; font-size: 14px; }
 .alternativa strong { display: block; font-size: 12px; color: var(--suave); }
 .dibujo { touch-action: manipulation; cursor: crosshair; max-width: 300px; margin: 0 auto; width: 100%; }
+.dibujo .agarre { touch-action: none; cursor: grab; }
 .dibujo svg { width: 100%; height: auto; display: block; }
 .lectura { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; min-height: 2.9em; text-align: center; }
 .nota { font-size: 12px; color: var(--suave); line-height: 1.45; margin: 0; }
