@@ -20,6 +20,7 @@ const ICONOS = {
   movil: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   volver: '<path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/>',
   abajo: '<path d="M6 9l6 6 6-6"/>',
+  mapa: '<path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5"/><path d="M15 6.5V20"/>',
 };
 function svg(nombre, tam = 20) {
   return `<svg aria-hidden="true" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONOS[nombre]}</svg>`;
@@ -145,6 +146,7 @@ function iniciarMapa() {
   // Con la isla entera, solo los localizadores; los nombres salen al acercarse.
   const nombres = () => mapa.getContainer().classList.toggle('con-nombres', mapa.getZoom() >= ZOOM_NOMBRES);
   mapa.on('zoomend', nombres);
+  mapa.on('moveend', refrescarLista);
   mapa.fitBounds(TENERIFE);
   nombres();
 }
@@ -203,14 +205,36 @@ function sinTiempo() {
   return datos.sin_tiempo ? el('strong', { class: 'sin-tiempo' }, ' Ojo: esta vez no se pudo consultar la previsión del tiempo; las notas suponen el cielo despejado.') : null;
 }
 
+// Miradores que se ven en la parte del mapa que no tapa el panel, del más
+// cercano al más lejano al centro de esa parte (Aaron, 23-10-2026).
+function miradoresALaVista() {
+  const tam = mapa.getSize(), [derecha, abajo] = margenPanel();
+  const ancho = tam.x - derecha, alto = tam.y - abajo, centro = L.point(ancho / 2, alto / 2);
+  return Object.keys(datos.miradores)
+    .map(clave => {
+      const m = datos.miradores[clave];
+      return { clave, p: mapa.latLngToContainerPoint([m.lat, m.lon]) };
+    })
+    .filter(({ p }) => p.x >= 0 && p.y >= 0 && p.x <= ancho && p.y <= alto)
+    .sort((a, b) => a.p.distanceTo(centro) - b.p.distanceTo(centro))
+    .map(({ clave }) => ({ clave, mejor: mejorObjetivo(clave) }));
+}
+
+// Al mover el mapa o abrir el panel, la lista cambia (solo sin mirador abierto).
+function refrescarLista() {
+  if (!estado.mirador) document.getElementById('contenido').replaceChildren(...pintarLista());
+}
+
 function pintarLista() {
-  const filas = Object.keys(datos.miradores)
-    .map(clave => ({ clave, mejor: mejorObjetivo(clave) }))
-    .sort((a, b) => ORDEN[a.mejor.r.color] - ORDEN[b.mejor.r.color] ||
-                    (b.mejor.r.marca ? 1 : 0) - (a.mejor.r.marca ? 1 : 0));
+  const filas = miradoresALaVista();
+  const todos = filas.length === Object.keys(datos.miradores).length;
+  const verTodos = el('button', { class: 'ver-todos', onclick: verTenerife,
+    html: svg('mapa', 16) + '<span>Ver todos los miradores</span>' });
   return [
     seccion('¿Cuándo?', botonesDias()),
-    seccion('Lo mejor de cada mirador', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
+    filas.length ? null : el('p', { class: 'vacio' }, 'No hay miradores en esta parte del mapa.'),
+    todos ? null : verTodos,
+    filas.length ? seccion('En el mapa, del más cercano al centro', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
@@ -218,9 +242,9 @@ function pintarLista() {
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
-    }))),
+    }))) : null,
     el('p', { class: 'pie' }, `Toca un localizador o un mirador para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
-  ];
+  ].filter(Boolean);
 }
 
 // --- La rueda del horizonte: tú en el centro, girando ----------------------
@@ -546,6 +570,7 @@ function plegar(si) {
   if (si) panel.classList.remove('grande');
   boton.textContent = si ? 'Mostrar panel' : 'Ver mapa';
   boton.setAttribute('aria-expanded', String(!si));
+  refrescarLista();      // cambia la parte del mapa que se ve
 }
 
 function pintarTodo() {

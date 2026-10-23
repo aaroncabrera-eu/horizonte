@@ -258,3 +258,11 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .fila-nota.subtotal { border-top: 2px solid var(--borde); }
 .fila-nota.total { border-top: 2px solid var(--texto); }
 .fila-nota.total strong, .fila-nota.total .cifra { font-size: 16px; }
+/* Lista sin mirador abierto: aviso y botón para ver la isla entera. */
+.vacio { margin: 0; font-size: 14px; color: var(--suave); }
+.ver-todos {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 10px 12px; border-radius: var(--radio); border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--primario); font-weight: 700; font-size: 14px;
+}
+.ver-todos:hover { border-color: #b9c6d2; }
