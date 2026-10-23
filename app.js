@@ -477,11 +477,18 @@ function acciones(m, r) {
   const llegar = el('a', { class: 'accion', target: '_blank', rel: 'noopener',
     href: `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`,
     html: svg('ruta', 18) + '<span>Cómo llegar</span>' });
+  // Avísame abre un mini menú: Google Calendar en Android no abre los .ics
+  // (Aaron, 23-10-2026), así que va por su enlace; el resto, con el archivo.
+  const menu = el('div', { class: 'menu-aviso', hidden: '' },
+    el('a', { class: 'opcion-aviso', target: '_blank', rel: 'noopener', href: enlaceGoogle(m, r) },
+      el('strong', {}, 'Google Calendar'), el('span', {}, 'Se abre ya rellenado: dale a Guardar')),
+    el('button', { class: 'opcion-aviso', onclick: () => descargarAviso(m, r) },
+      el('strong', {}, 'Otro calendario'), el('span', {}, 'iPhone, Samsung, Outlook… con alarma 1 h antes')));
   const avisar = r.hora ? el('button', { class: 'accion', html: svg('campana', 18) + '<span>Avísame</span>',
-    onclick: () => descargarAviso(m, r) }) : null;
+    onclick: () => { menu.hidden = !menu.hidden; } }) : null;
   const compartir = el('button', { class: 'accion', html: svg('compartir', 18) + '<span>Compartir</span>',
     onclick: () => compartirPlan(m, r, compartir) });
-  return el('div', { class: 'acciones' }, llegar, avisar, compartir);
+  return el('div', {}, el('div', { class: 'acciones' }, llegar, avisar, compartir), r.hora ? menu : null);
 }
 
 const fechaLarga = dia => new Date(dia + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -500,9 +507,8 @@ function instante(dia, hhmm) {
   return new Date(aprox.getTime() - desfase * 3600e3);
 }
 
-// Un evento de calendario (.ics) con alarma una hora antes. El móvil lo abre
-// con su calendario; no hace falta servidor ni cuenta.
-function descargarAviso(m, r) {
+// Lo que lleva el aviso: cuándo empieza y acaba, título y descripción.
+function eventoAviso(m, r) {
   const nombre = partesNombre(m.nombre)[0];
   const [ini, fin] = r.hora.split('-');
   let desde, hasta;
@@ -515,16 +521,32 @@ function descargarAviso(m, r) {
     desde = new Date(t.getTime() - 30 * 60e3);
     hasta = new Date(t.getTime() + 30 * 60e3);
   }
-  const utc = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const notaTxt = r.puntos != null ? ` (${coma(r.puntos)}/10)` : '';
+  return { nombre, desde, hasta, titulo: `${CORTO[estado.objetivo] || estado.objetivo} en ${nombre}`,
+           descripcion: `${TITULO[r.color]}${notaTxt}. ${textoHora(estado.objetivo, r)}.\n${location.href}` };
+}
+const utc = d => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+
+// Google Calendar: su página de «nuevo evento» ya rellenada.
+function enlaceGoogle(m, r) {
+  if (!r.hora) return '';
+  const e = eventoAviso(m, r);
+  return 'https://calendar.google.com/calendar/render?' + new URLSearchParams({
+    action: 'TEMPLATE', text: e.titulo, dates: `${utc(e.desde)}/${utc(e.hasta)}`,
+    details: e.descripcion, location: `${e.nombre} (${m.lat},${m.lon})` });
+}
+
+// Un evento de calendario (.ics) con alarma una hora antes. El móvil lo abre
+// con su calendario; no hace falta servidor ni cuenta.
+function descargarAviso(m, r) {
+  const { nombre, desde, hasta, titulo, descripcion } = eventoAviso(m, r);
   // En los .ics, comas, puntos y coma y saltos de línea van escapados.
   const txt = s => s.replace(/\\/g, '\\\\').replace(/[,;]/g, c => '\\' + c).replace(/\n/g, '\\n');
-  const titulo = `${CORTO[estado.objetivo] || estado.objetivo} en ${nombre}`;
-  const notaTxt = r.puntos != null ? ` (${coma(r.puntos)}/10)` : '';
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Horizonte//ES', 'BEGIN:VEVENT',
     `UID:${estado.mirador}-${estado.dia}-${EN_ENLACE[estado.objetivo]}@horizonte`,
     `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(desde)}`, `DTEND:${utc(hasta)}`,
     `SUMMARY:${txt(titulo)}`, `LOCATION:${txt(nombre)}`, `GEO:${m.lat};${m.lon}`,
-    `DESCRIPTION:${txt(`${TITULO[r.color]}${notaTxt}. ${textoHora(estado.objetivo, r)}.\n${location.href}`)}`,
+    `DESCRIPTION:${txt(descripcion)}`,
     `URL:${location.href}`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-PT60M', `DESCRIPTION:${txt(titulo + ': sal en un rato')}`, 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR'].join('\r\n');

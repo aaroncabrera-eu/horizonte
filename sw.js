@@ -4,7 +4,7 @@
 //
 // Súbelo junto al ?v= de index.html: al cambiar VERSION se rehace la caché
 // de la web (los trozos de mapa se conservan).
-const VERSION = '20261023z';
+const VERSION = '20261024a';
 const WEB = 'horizonte-web-' + VERSION;
 const MAPA = 'horizonte-mapa';
 const MAX_TESELAS = 2500;          // ~40-60 MB como mucho

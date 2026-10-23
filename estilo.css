@@ -278,3 +278,13 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
   background: var(--tarjeta); color: var(--primario); font-size: 13px; font-weight: 700; text-decoration: none;
 }
 .accion:active { background: var(--primario-claro); }
+/* Menú de Avísame: dos opciones de calendario. */
+.menu-aviso[hidden] { display: none; }
+.menu-aviso { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.opcion-aviso {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  padding: 10px 14px; border-radius: 14px; border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--texto); text-decoration: none; font-size: 14px;
+}
+.opcion-aviso strong { color: var(--primario); }
+.opcion-aviso span { color: var(--suave); font-size: 12.5px; }
