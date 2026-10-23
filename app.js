@@ -309,12 +309,14 @@ function pintarRueda(m, azimut) {
 // Al tocar la rueda (o pasar el ratón): qué hay en esa dirección. En el móvil,
 // un toque coloca la línea y luego se puede arrastrar cogiéndola (Aaron,
 // 23-10-2026); deslizar por el resto de la rueda sigue moviendo el panel.
-function conectarRueda(dibujo, lectura, m) {
+function conectarRueda(dibujo, lectura, m, azInicial) {
   const mover = ev => {
     const caja = dibujo.querySelector('svg').getBoundingClientRect();
     const dx = ev.clientX - (caja.left + caja.width / 2), dy = ev.clientY - (caja.top + caja.height / 2);
     if (Math.hypot(dx, dy) < caja.width * 0.1) return;      // encima de ti: sin dirección
-    const az = (Math.round(Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
+    ponerEn((Math.round(Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360);
+  };
+  const ponerEn = az => {
     const [x, y] = punto(az, 166);
     const cursor = dibujo.querySelector('.cursor');
     for (const linea of cursor.querySelectorAll('line')) { linea.setAttribute('x2', x); linea.setAttribute('y2', y); }
@@ -340,6 +342,9 @@ function conectarRueda(dibujo, lectura, m) {
   const soltar = () => { arrastrando = false; };
   agarre.addEventListener('pointerup', soltar);
   agarre.addEventListener('pointercancel', soltar);
+  // Ya puesta desde el principio (Aaron, 23-10-2026): sin ella nadie sabría
+  // que se puede usar.
+  ponerEn(Math.round(azInicial ?? 0) % 360);
 }
 
 // --- Vista mirador: resumen con las cuatro opciones o detalle de una ----------
@@ -407,14 +412,15 @@ function pintarDetalle() {
   }
   if (r.consejo) {
     partes.push(el('div', { class: 'caja consejo' },
-      el('span', { class: 'titulo-consejo', html: svg('movil', 18) + '<span>Con el móvil</span>' }),
+      el('span', { class: 'titulo-consejo', html: svg('movil', 18) + '<span>Nota para fotografiar con el móvil</span>' }),
       el('p', {}, r.consejo)));
   }
 
   const dibujo = el('div', { class: 'dibujo', html: pintarRueda(m, r.azimut) });
-  const lectura = el('p', { class: 'lectura', 'aria-live': 'polite' }, 'Toca alrededor de la rueda para ver qué hay en cada dirección.');
-  conectarRueda(dibujo, lectura, m);
+  const lectura = el('p', { class: 'lectura', 'aria-live': 'polite' });
+  conectarRueda(dibujo, lectura, m, r.azimut);
   partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Su horizonte: tú en el centro'), dibujo, lectura,
+    el('p', { class: 'ayuda-rueda' }, 'Arrastra la bolita (o toca la rueda) para ver qué hay en cada dirección.'),
     el('p', { class: 'nota' }, 'Visto desde arriba, con el norte arriba como en el mapa. ' +
       (r.azimut != null ? `La flecha marca hacia dónde ${VERBO[estado.objetivo]} (${rumbo(r.azimut)}). ` : '') +
       'El círculo discontinuo es la horizontal: el verde que sobresale es relieve que te tapa; el azul, el mar. Alturas exageradas.')));
@@ -427,8 +433,13 @@ function pintarDetalle() {
 
   const alternativas = [];
   if (r.otro_mirador) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Ese mismo día, desde otro mirador'), r.otro_mirador));
-  if (r.otro_dia) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día'), r.otro_dia));
-  if (r.ideal) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Momento ideal más cercano'), r.ideal));
+  // Si el otro día bueno y el momento ideal coinciden, una sola vez.
+  if (r.otro_dia && r.otro_dia === r.ideal) {
+    alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día (momento ideal)'), r.otro_dia));
+  } else {
+    if (r.otro_dia) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día'), r.otro_dia));
+    if (r.ideal) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Momento ideal más cercano'), r.ideal));
+  }
   if (alternativas.length) partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Alternativas'), ...alternativas));
   partes.push(el('p', { class: 'pie' }, `El tiempo es una previsión y puede cambiar: revísalo el mismo día. Previsión del ${datos.generado}.`, sinTiempo()));
   return partes;
