@@ -4,7 +4,7 @@
 //
 // Súbelo junto al ?v= de index.html: al cambiar VERSION se rehace la caché
 // de la web (los trozos de mapa se conservan).
-const VERSION = '20261023x';
+const VERSION = '20261023y';
 const WEB = 'horizonte-web-' + VERSION;
 const MAPA = 'horizonte-mapa';
 const MAX_TESELAS = 2500;          // ~40-60 MB como mucho
@@ -33,6 +33,9 @@ self.addEventListener('fetch', ev => {
   const url = new URL(ev.request.url);
   if (esTesela(url)) ev.respondWith(teselaPrimeroGuardada(ev.request));
   else if (url.pathname.endsWith('datos.json')) ev.respondWith(redPrimero(ev.request));
+  // La página: con red, siempre la nueva (si no, el móvil enseñaba la vieja
+  // hasta la siguiente vez que se abría; Aaron, 23-10-2026).
+  else if (ev.request.mode === 'navigate') ev.respondWith(paginaRedPrimero(ev.request));
   else ev.respondWith(guardadoYActualizar(ev.request));
 });
 
@@ -45,6 +48,17 @@ async function redPrimero(peticion) {
     return resp;
   } catch {
     return (await cache.match('datos.json')) || Response.error();
+  }
+}
+
+async function paginaRedPrimero(peticion) {
+  const cache = await caches.open(WEB);
+  try {
+    const resp = await fetch(peticion, { cache: 'no-cache' });   // saltar la caché de 10 min
+    if (resp.ok) cache.put('index.html', resp.clone());
+    return resp;
+  } catch {
+    return (await cache.match('index.html')) || (await cache.match('./')) || Response.error();
   }
 }
 

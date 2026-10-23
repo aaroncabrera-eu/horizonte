@@ -741,7 +741,9 @@ function teselasDeLosMiradores() {
 
 function prepararSinConexion() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready)
+  // updateViaCache 'none': buscar el trabajador nuevo sin esperar a la caché
+  // del navegador (GitHub la deja 10 min).
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(() => navigator.serviceWorker.ready)
     .then(reg => reg.active && reg.active.postMessage({ tipo: 'guardar-teselas', urls: teselasDeLosMiradores() }))
     .catch(() => { /* sin trabajador: la web sigue funcionando con red */ });
   // Al perder o recuperar la red, actualizar el aviso.
