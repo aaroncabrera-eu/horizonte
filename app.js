@@ -440,13 +440,48 @@ function pintarFrente(m, r, objetivo) {
     const az = ((a % 360) + 360) % 360;
     rumbos += `<text x="${x(rel(az, c))}" y="${H - 7}" font-size="10.5" fill="#56657A" text-anchor="middle">${az}° ${a % 45 === 0 ? rumbo(az) : ''}</text>`;
   }
+  // Nubes de la previsión (Aaron, 23-10-2026): cada una donde se vería, más
+  // opaca cuanto más probable; las de delante (mar de nubes) tapan el relieve.
+  const pxGrado = W / (2 * mitad), pyGrado = (H - ABAJO - ARRIBA) / (yMax - yMin);
+  const nube = ([az, h, pct, ancho, alto, capa]) => {
+    const d = rel(az, c);
+    if (Math.abs(d) > mitad + ancho / 2 || h < yMin - alto || h > yMax + alto) return '';
+    const cx = x(d), cy = y(h), w = Math.max(14, Math.min(20, ancho) * pxGrado), op = (pct / 100 * 0.7).toFixed(2);
+    if (capa !== 'b') {           // medias y altas: velos alargados (al atardecer, tintados)
+      const color = sol ? (capa === 'a' ? '#F5C2B0' : '#F2D2B8') : '#F4F6F8';
+      return `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(w / 2).toFixed(1)}" ry="${capa === 'a' ? 2.5 : 4}" fill="${color}" opacity="${op}"/>`;
+    }
+    const hpx = Math.max(6, Math.min(40, alto * pyGrado));
+    const bola = (dx, dy, rx, ry) => `<ellipse cx="${(cx + dx * w).toFixed(1)}" cy="${(cy + dy * hpx).toFixed(1)}" rx="${(rx * w).toFixed(1)}" ry="${(ry * hpx).toFixed(1)}"/>`;
+    const forma = bola(-0.22, 0.05, 0.28, 0.45) + bola(0, -0.2, 0.3, 0.6) + bola(0.22, 0.05, 0.28, 0.45) + bola(0, 0.15, 0.48, 0.35);
+    return `<g opacity="${op}" fill="#FFFFFF">${forma}<ellipse cx="${cx.toFixed(1)}" cy="${(cy + 0.3 * hpx).toFixed(1)}" rx="${(0.42 * w).toFixed(1)}" ry="${(0.18 * hpx).toFixed(1)}" fill="#DCE3EA"/></g>`;
+  };
+  const nubes = r.nubes || [];
+  const nubesDetras = nubes.filter(n => !n[6]).map(nube).join('');
+  const nubesDelante = nubes.filter(n => n[6]).map(nube).join('');
+  // Calima (Aaron, 23-10-2026): neblina de puntitos marrones pegada al
+  // horizonte, más densa cuanto más turbio el aire (r.aod, turbidez).
+  let calima = '';
+  if (r.aod != null && r.aod >= 0.2) {
+    const fuerza = Math.min(1, (r.aod - 0.1) / 0.6);
+    const techo = y(Math.min(yMax, 0 + 2 + 6 * fuerza));
+    calima = `<rect y="${techo.toFixed(1)}" width="${W}" height="${(H - ABAJO - techo).toFixed(1)}" fill="url(#puntos-calima)" mask="url(#sube-calima)" opacity="${(0.4 + 0.5 * fuerza).toFixed(2)}"/>` +
+      `<rect y="${techo.toFixed(1)}" width="${W}" height="${(H - ABAJO - techo).toFixed(1)}" fill="#C9A06A" mask="url(#sube-calima)" opacity="${(0.15 + 0.3 * fuerza).toFixed(2)}"/>`;
+  }
   const cielo = sol ? ['#EAF2F8', '#F8DDB4'] : ['#E3EAF2', '#C9D6E4'];
   return {
     svg: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="El horizonte de frente desde ${m.nombre}, con el camino del ${sol ? 'sol' : 'la luna'}">
-      <defs><linearGradient id="cielo-frente" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cielo[0]}"/><stop offset="1" stop-color="${cielo[1]}"/></linearGradient></defs>
+      <defs><linearGradient id="cielo-frente" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cielo[0]}"/><stop offset="1" stop-color="${cielo[1]}"/></linearGradient>
+        <clipPath id="recorte-frente"><rect width="${W}" height="${H - ABAJO}"/></clipPath>
+        <pattern id="puntos-calima" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="1.2" cy="1.2" r=".8" fill="#9C6B30"/><circle cx="3.7" cy="3.6" r=".7" fill="#9C6B30"/></pattern>
+        <linearGradient id="sube-calima-g" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <mask id="sube-calima" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#sube-calima-g)"/></mask></defs>
       <rect width="${W}" height="${H - ABAJO}" fill="url(#cielo-frente)"/>
+      <g clip-path="url(#recorte-frente)">${nubesDetras}
       <line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#13202E" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
-      ${suelo}${etiquetas}${puntos}${rumbos}</svg>`,
+      ${suelo}${calima}${nubesDelante}</g>${etiquetas}${puntos}${rumbos}</svg>`,
+    hayNubes: nubes.length > 0,
+    hayCalima: calima !== '',
     exagera: Math.max(1, Math.round(exagera)),
     rumbo: rumbo(c),
   };
@@ -705,7 +740,9 @@ function pintarDetalle() {
       el('div', { class: 'frente', html: frente.svg }),
       el('p', { class: 'nota' }, `De frente, mirando hacia el ${frente.rumbo}. Cada punto marca dónde estará ` +
         `${estado.objetivo === 'Salida de luna' ? 'la luna' : 'el sol'} cada 5 minutos; los huecos, cuando lo tapa el relieve. ` +
-        `La línea discontinua es la horizontal${frente.exagera > 1 ? `; alturas ×${frente.exagera} para que se vea bien` : ''}.`)));
+        `La línea discontinua es la horizontal${frente.exagera > 1 ? `; alturas ×${frente.exagera} para que se vea bien` : ''}.` +
+        (frente.hayNubes ? ' Las nubes, donde las pone la previsión a esa hora: más opacas cuanto más probables.' : '') +
+        (frente.hayCalima ? ` Los puntitos marrones son calima (turbidez ${coma(r.aod)}): el horizonte se verá borroso.` : ''))));
   }
 
   const dibujo = el('div', { class: 'dibujo', html: pintarRueda(m, r.azimut) });
