@@ -578,10 +578,12 @@ function cabezaMirador(m) {
     m.teide != null ? el('span', { class: 'teide' }, el('span', { class: 'triangulo' }), 'Se ve el Teide') : null);
 }
 
+const textoVolver = () => estado.ocasiones ? 'Próximas ocasiones' : 'Spots';
+
 function pintarResumen() {
   const m = datos.miradores[estado.mirador];
   return [
-    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los spots</span>' }),
+    el('button', { class: 'volver', onclick: () => { cerrarMirador(false); irArriba(); }, html: svg('volver', 18) + `<span>${textoVolver()}</span>` }),
     cabezaMirador(m),
     seccion('¿Cuándo?', botonesDias()),
     seccion('¿Qué quieres ver?', el('ul', { class: 'lista' }, OBJETIVOS.map(o => {
@@ -749,8 +751,10 @@ function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
   const r = resultado(estado.mirador, estado.objetivo);
   const partes = [
-    el('button', { class: 'volver', onclick: () => { estado.objetivo = null; pintarTodo(); irArriba(); },
-      html: svg('volver', 18) + `<span>${partesNombre(m.nombre)[0]}</span>` }),
+    // Atrás: a la lista de spots (o a las ocasiones), con el mapa donde está;
+    // las cuatro opciones ya están arriba (Aaron, 23-10-2026).
+    el('button', { class: 'volver', onclick: () => { cerrarMirador(false); irArriba(); },
+      html: svg('volver', 18) + `<span>${textoVolver()}</span>` }),
     cabezaMirador(m),
     seccion('¿Cuándo?', botonesDias()),
     // Cambiar de opción sin volver al resumen (Aaron, 23-10-2026); cada una
@@ -862,6 +866,9 @@ function cerrarMirador(moverMapa = true) {
   estado.mirador = null; estado.objetivo = null;
   pintarTodo();
   if (moverMapa) verTenerife();
+  // En el móvil el panel se encoge al cerrar el spot: cuando acabe, se mira
+  // otra vez qué spots quedan a la vista.
+  else setTimeout(refrescarLista, 400);
 }
 
 // Esconder el panel para ver el mapa entero (y volver a sacarlo).
