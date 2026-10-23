@@ -23,9 +23,13 @@ const ICONOS = {
   mapa: '<path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5"/><path d="M15 6.5V20"/>',
   ruta: '<path d="M12 21s-6-5.6-6-10.5A6 6 0 0 1 18 10.5C18 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.2"/>',
   calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  meteoro: '<path d="M3.5 3.5l9 9"/><path d="M8.5 3.5l5 5"/><path d="M3.5 8.5l5 5"/><circle cx="16" cy="16" r="3.5"/>',
+  galaxia: '<ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-28 12 12)"/><circle cx="12" cy="12" r="1.9"/><path d="M5 6h.01M19 18h.01M18.5 5.5h.01M5.5 18.5h.01"/>',
   campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   compartir: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
 };
+// La marca de lluvia de estrellas, en palabras (sin emoji, Aaron 24-10-2026).
+const marcaTexto = m => m === '☄️' ? 'lluvia de estrellas' : m;
 function svg(nombre, tam = 20) {
   return `<svg aria-hidden="true" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONOS[nombre]}</svg>`;
 }
@@ -284,7 +288,7 @@ function pintarLista() {
     filas.length ? seccion(lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
-        : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
+        : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
       return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' || r.color === 'pasado' ? null : mejor.o) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
@@ -592,7 +596,7 @@ function pintarResumen() {
       const r = resultado(estado.mirador, o);
       // Si no hay nota, el veredicto ya va en la pastilla: no repetirlo.
       const hora = o === 'Estrellas' && r.hora ? textoHora(o, r) : r.hora;
-      const sub = [r.puntos != null && r.color !== 'pasado' ? TITULO[r.color] : null, hora, r.marca].filter(Boolean).join(' · ');
+      const sub = [r.puntos != null && r.color !== 'pasado' ? TITULO[r.color] : null, hora, marcaTexto(r.marca)].filter(Boolean).join(' · ');
       const nubes = r.prob_nubes != null ? `${r.prob_nubes} % de nubes` : null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => { estado.objetivo = o; pintarTodo(); irArriba(); } },
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
@@ -719,34 +723,40 @@ function iconoOcasion(tipo) {
   if (tipo === 'luna') return el('span', { class: 'icono-obj', html: svg('Salida de luna', 20) });
   if (tipo === 'oscuras') return el('span', { class: 'icono-obj', html: svg('Estrellas', 20) });
   if (tipo === 'teide') return el('span', { class: 'icono-obj teide-icono' }, el('span', { class: 'triangulo' }));
-  return el('span', { class: 'icono-obj emoji' }, tipo === 'lluvia' ? '☄️' : '🌌');
+  return el('span', { class: 'icono-obj', html: svg(tipo === 'lluvia' ? 'meteoro' : 'galaxia', 20) });
 }
 
 function pintarOcasiones() {
+  // Dos partes (Aaron, 24-10-2026): las que caen en los días con previsión
+  // (se pueden abrir) y, por meses, las que aún no la tienen.
+  const diaCon = o => datos.dias.find(d => d >= o.fecha && d <= (o.hasta || o.fecha));
+  const fila = o => {
+    const dia = diaCon(o);
+    const contenido = [iconoOcasion(o.tipo),
+      el('span', { class: 'texto' },
+        el('span', { class: 'titulo' }, o.titulo),
+        el('span', { class: 'sub' }, `${cuandoOcasion(o)} · ${partesNombre(datos.miradores[o.spot].nombre)[0]}`),
+        el('span', { class: 'sub explica-ocasion' }, o.texto))];
+    return el('li', {}, dia
+      ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; estado.ocasiones = false; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
+      : el('div', { class: 'fila sin-prevision' }, ...contenido));
+  };
+  const ya = datos.ocasiones.filter(diaCon), luego = datos.ocasiones.filter(o => !diaCon(o));
   const porMes = {};
-  for (const o of datos.ocasiones) {
-    const desde = o.fecha < datos.dias[0] ? datos.dias[0] : o.fecha;
-    const mes = new Date(desde + 'T12:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  for (const o of luego) {
+    const mes = new Date(o.fecha + 'T12:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     (porMes[mes] = porMes[mes] || []).push(o);
   }
   return [
     el('button', { class: 'volver', onclick: () => { estado.ocasiones = false; pintarTodo(); irArriba(); },
       html: svg('volver', 18) + '<span>Hoy y próximos días</span>' }),
     el('div', { class: 'cabeza-ficha' }, el('h2', {}, 'Próximas ocasiones'),
-      el('p', {}, 'Lo especial de los próximos meses en todos los spots. Sin contar el tiempo: las nubes se saben con unos 5 días.')),
-    ...Object.entries(porMes).map(([mes, lista]) => seccion(mayuscula(mes), el('ul', { class: 'lista' }, lista.map(o => {
-      // Abrible si alguno de sus días ya tiene datos.
-      const dia = datos.dias.find(d => d >= o.fecha && d <= (o.hasta || o.fecha));
-      const contenido = [iconoOcasion(o.tipo),
-        el('span', { class: 'texto' },
-          el('span', { class: 'titulo' }, o.titulo),
-          el('span', { class: 'sub' }, `${cuandoOcasion(o)} · ${partesNombre(datos.miradores[o.spot].nombre)[0]}`),
-          el('span', { class: 'sub explica-ocasion' }, o.texto + (dia ? '' : ' Aún sin previsión del tiempo.')))];
-      return el('li', {}, dia
-        ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; estado.ocasiones = false; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
-        : el('div', { class: 'fila' }, ...contenido));
-    })))),
-  ];
+      el('p', {}, 'Lo especial de los próximos meses en todos los spots.')),
+    ya.length ? seccion('Estos días: con previsión del tiempo', el('p', { class: 'nota-seccion' }, 'Toca una para ver su nota con las nubes.'),
+      el('ul', { class: 'lista' }, ya.map(fila))) : null,
+    luego.length ? el('p', { class: 'separador-ocasiones' }, 'Más adelante: aún sin previsión del tiempo (las nubes se saben con unos 5 días).') : null,
+    ...Object.entries(porMes).map(([mes, lista]) => seccion(mayuscula(mes), el('ul', { class: 'lista' }, lista.map(fila)))),
+  ].filter(Boolean);
 }
 
 function pintarDetalle() {
@@ -778,7 +788,7 @@ function pintarDetalle() {
   if ((r.desglose || []).some(d => d.factor === 'Mar de nubes debajo'))
     datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + '<span>Mar de nubes debajo</span>' }));
   const lluvia = (r.desglose || []).find(d => d.factor === 'Lluvia de estrellas');
-  if (lluvia) datosEstado.push(el('span', { class: 'dato ideal' }, `☄️ ${lluvia.texto.split(' (')[0]}`));
+  if (lluvia) datosEstado.push(el('span', { class: 'dato ideal', html: svg('meteoro', 15) + `<span>${lluvia.texto.split(' (')[0]}</span>` }));
   if (r.marca === '🎨') datosEstado.push(el('span', { class: 'dato ideal', html: svg('paleta', 15) + '<span>El cielo puede encenderse</span>' }));
   partes.push(el('div', { class: `estado ${r.color}` },
     el('div', { class: 'fila-estado' },
