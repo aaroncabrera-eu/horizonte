@@ -258,12 +258,12 @@ function pintarLista() {
   const filas = lejos ? mejoresPrimero() : miradoresALaVista();
   const todos = lejos || filas.length === Object.keys(datos.miradores).length;
   const verTodos = el('button', { class: 'ver-todos', onclick: verTenerife,
-    html: svg('mapa', 16) + '<span>Ver todos los miradores</span>' });
+    html: svg('mapa', 16) + '<span>Ver todos los spots</span>' });
   return [
     seccion('¿Cuándo?', botonesDias()),
-    filas.length ? null : el('p', { class: 'vacio' }, 'No hay miradores en esta parte del mapa.'),
+    filas.length ? null : el('p', { class: 'vacio' }, 'No hay spots en esta parte del mapa.'),
     todos ? null : verTodos,
-    filas.length ? seccion(lejos ? 'Lo mejor de cada mirador' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
+    filas.length ? seccion(lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
@@ -272,7 +272,7 @@ function pintarLista() {
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
     }))) : null,
-    el('p', { class: 'pie' }, `Toca un localizador o un mirador para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
+    el('p', { class: 'pie' }, `Toca un localizador o un spot para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ].filter(Boolean);
 }
 
@@ -360,7 +360,7 @@ function pintarRueda(m, azimut) {
     ${cunas}
     <circle cx="${C}" cy="${C}" r="${DENTRO}" fill="#F4F6F8" stroke="#DCE2E8"/>
     <circle cx="${C}" cy="${C}" r="${HORIZONTAL}" fill="none" stroke="#13202E" stroke-width="1.2" stroke-dasharray="4 4"/>
-    ${letras}${cumbres}${flecha}
+    ${letras}${flecha}${cumbres}
     <g class="cursor" visibility="hidden">
       <line class="linea" x1="${C}" y1="${C}" x2="${C}" y2="${C}" stroke="#13202E" stroke-width="1.5"/>
       <circle class="bola" cx="${C}" cy="${C}" r="8" fill="#13202E" stroke="#fff" stroke-width="2"/>
@@ -449,7 +449,7 @@ function cabezaMirador(m) {
 function pintarResumen() {
   const m = datos.miradores[estado.mirador];
   return [
-    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los miradores</span>' }),
+    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los spots</span>' }),
     cabezaMirador(m),
     seccion('¿Cuándo?', botonesDias()),
     seccion('¿Qué quieres ver?', el('ul', { class: 'lista' }, OBJETIVOS.map(o => {
@@ -489,9 +489,11 @@ function pintarDetalle() {
   const datosEstado = [];
   if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que las nubes ${TAPAN[estado.objetivo]}</span>` }));
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
-  // El Teide cuenta ese día (despejado y aire limpio): +0,5 en la nota.
-  if ((r.desglose || []).some(d => d.factor === 'El Teide a la vista' && d.puntos > 0))
+  // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
+  if ((r.desglose || []).some(d => d.factor === 'Paisaje' && d.texto.includes('Teide')))
     datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }), el('span', {}, 'Teide despejado')));
+  if ((r.desglose || []).some(d => d.factor === 'Mar de nubes debajo'))
+    datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + '<span>Mar de nubes debajo</span>' }));
   if (r.marca === '🎨') datosEstado.push(el('span', { class: 'dato ideal', html: svg('paleta', 15) + '<span>El cielo puede encenderse</span>' }));
   partes.push(el('div', { class: `estado ${r.color}` },
     el('div', { class: 'fila-estado' },
@@ -531,7 +533,7 @@ function pintarDetalle() {
   partes.push(el('div', { class: 'caja' }, boton, lista));
 
   const alternativas = [];
-  if (r.otro_mirador) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Ese mismo día, desde otro mirador'), r.otro_mirador));
+  if (r.otro_mirador) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Ese mismo día, desde otro spot'), r.otro_mirador));
   // Si el otro día bueno y el momento ideal coinciden, una sola vez.
   if (r.otro_dia && r.otro_dia === r.ideal) {
     alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día (momento ideal)'), r.otro_dia));
