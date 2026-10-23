@@ -993,6 +993,7 @@ fetch('datos.json', { cache: 'no-cache' })
     // ordenador el panel solo se cierra con su botón.
     mapa.on('click', () => {
       if (estado.mirador) cerrarMirador(false);
+      else if (estado.ocasiones) { estado.ocasiones = false; pintarTodo(); irArriba(); }   // a los spots
       else if (!esOrdenador()) plegar(true);
     });
     document.querySelector('.cabecera').addEventListener('click', () => {
