@@ -210,10 +210,10 @@ function sinTiempo() {
   return datos.sin_tiempo ? el('strong', { class: 'sin-tiempo' }, ' Ojo: esta vez no se pudo consultar la previsión del tiempo; las notas suponen el cielo despejado.') : null;
 }
 
-// Con el mapa lejos (zoom < ZOOM_CERCA) la lista no se mueve: todos, de
-// mejor a peor; si no, cualquier roce del mapa la reordenaría (Aaron,
-// 23-10-2026). Al acercarse, solo los que se ven, del más cercano al centro.
-const ZOOM_CERCA = 11;
+// Lista sin mirador abierto (Aaron, 23-10-2026): siempre de mejor a peor
+// nota. Con el mapa lejos, todos; al acercarse (zoom ≥ ZOOM_CERCA), solo
+// los que se ven en el mapa: los mejores de esa zona.
+const ZOOM_CERCA = 12;
 
 function mejoresPrimero() {
   return Object.keys(datos.miradores)
@@ -221,19 +221,15 @@ function mejoresPrimero() {
     .sort((a, b) => comparar(a.mejor.r, b.mejor.r));
 }
 
-// Miradores que se ven en la parte del mapa que no tapa el panel, del más
-// cercano al más lejano al centro de esa parte (Aaron, 23-10-2026).
+// Miradores que se ven en la parte del mapa que no tapa el panel, de mejor a peor.
 function miradoresALaVista() {
   const tam = mapa.getSize(), [derecha, abajo] = margenPanel();
-  const ancho = tam.x - derecha, alto = tam.y - abajo, centro = L.point(ancho / 2, alto / 2);
-  return Object.keys(datos.miradores)
-    .map(clave => {
-      const m = datos.miradores[clave];
-      return { clave, p: mapa.latLngToContainerPoint([m.lat, m.lon]) };
-    })
-    .filter(({ p }) => p.x >= 0 && p.y >= 0 && p.x <= ancho && p.y <= alto)
-    .sort((a, b) => a.p.distanceTo(centro) - b.p.distanceTo(centro))
-    .map(({ clave }) => ({ clave, mejor: mejorObjetivo(clave) }));
+  const ancho = tam.x - derecha, alto = tam.y - abajo;
+  const aLaVista = new Set(Object.keys(datos.miradores).filter(clave => {
+    const m = datos.miradores[clave], p = mapa.latLngToContainerPoint([m.lat, m.lon]);
+    return p.x >= 0 && p.y >= 0 && p.x <= ancho && p.y <= alto;
+  }));
+  return mejoresPrimero().filter(({ clave }) => aLaVista.has(clave));
 }
 
 // Al mover el mapa o abrir el panel, la lista cambia (solo sin mirador abierto).
@@ -251,7 +247,7 @@ function pintarLista() {
     seccion('¿Cuándo?', botonesDias()),
     filas.length ? null : el('p', { class: 'vacio' }, 'No hay miradores en esta parte del mapa.'),
     todos ? null : verTodos,
-    filas.length ? seccion(lejos ? 'Lo mejor de cada mirador' : 'En el mapa, del más cercano al centro', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
+    filas.length ? seccion(lejos ? 'Lo mejor de cada mirador' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
