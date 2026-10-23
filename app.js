@@ -33,6 +33,20 @@ const TITULO = { verde: 'Merece la pena', amarillo: 'Regular', rojo: 'No merece 
 const ORDEN = { verde: 0, amarillo: 1, rojo: 2 };
 const VERBO = { 'Salida de luna': 'sale la luna', 'Atardecer': 'se pone el sol',
                 'Amanecer': 'sale el sol', 'Estrellas': 'sin luna' };
+// Cuándo: «Sale la luna a las 18:02»; para las estrellas, si el rato es sin
+// luna o con ella toda la noche (Aaron, 23-10-2026: decía «sin luna» siempre).
+function textoHora(objetivo, r) {
+  if (!r.hora) return objetivo === 'Estrellas' ? 'Esa noche no llega a oscurecer del todo' : 'Ese día no se ve desde aquí';
+  if (objetivo !== 'Estrellas') return `${mayuscula(VERBO[objetivo])} a las ${r.hora}`;
+  const [a, b] = r.hora.split('-');
+  if (r.sin_luna === true) return `Sin luna de ${a} a ${b}`;
+  if (r.sin_luna === false) return `Con luna toda la noche (${a} – ${b})`;
+  return `Noche cerrada de ${a} a ${b}`;        // datos antiguos, sin ese dato
+}
+
+// Qué tapan las nubes, según lo que se quiere ver.
+const TAPAN = { 'Salida de luna': 'la tapen', 'Atardecer': 'lo tapen', 'Amanecer': 'lo tapen',
+                'Estrellas': 'tapen el cielo' };
 const RUMBOS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
 function rumbo(az) { return RUMBOS[Math.round(az / 22.5) % 16]; }
 const TENERIFE = [[27.99, -16.93], [28.60, -16.11]];
@@ -137,9 +151,10 @@ const ZOOM_NOMBRES = 12;
 function iniciarMapa() {
   mapa = L.map('mapa', { zoomControl: false, attributionControl: true });
   // Relieve algo apagado (clase fondo-suave) para que no choquen.
-  const relieve = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  // crossOrigin: el trabajador sin conexión puede guardar los trozos de mapa.
+  const relieve = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { crossOrigin: true,
     maxZoom: 17, className: 'fondo-suave', attribution: '© OpenStreetMap, SRTM · © OpenTopoMap (CC-BY-SA)' });
-  const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  const satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { crossOrigin: true,
     maxZoom: 18, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' });
   relieve.addTo(mapa);
   // Tipo de mapa y zoom a la izquierda (el panel va a la derecha), en fila.
@@ -207,6 +222,7 @@ function pastilla(r) {
 // --- Vista lista: lo mejor de cada mirador ese día ---------------------------
 // Si Open-Meteo no respondió al calcular, las notas no cuentan las nubes.
 function sinTiempo() {
+  if (!navigator.onLine) return el('strong', { class: 'sin-tiempo' }, ' Sin conexión: son los últimos datos guardados en el móvil.');
   return datos.sin_tiempo ? el('strong', { class: 'sin-tiempo' }, ' Ojo: esta vez no se pudo consultar la previsión del tiempo; las notas suponen el cielo despejado.') : null;
 }
 
@@ -394,10 +410,10 @@ function tablaNota(r) {
   const factor = (nombre, texto) => el('span', {}, el('strong', {}, nombre), texto ? el('span', { class: 'explica' }, comas(mayuscula(texto))) : null);
   const libre = r.prob_nubes != null ? (100 - r.prob_nubes) / 100 : null;
   return el('div', { class: 'tabla-nota' },
-    el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`),
+    r.delante ? el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`) : null,
     r.desglose.map(d => fila(factor(d.factor, d.texto), d.max != null ? `${num(d.puntos)} / ${d.max}` : num(d.puntos))),
     fila(factor('Con el cielo despejado'), `${num(r.calidad)} / 10`, 'subtotal'),
-    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${estado.objetivo === 'Salida de luna' ? 'la' : 'lo'} tapen` : 'aún no se pueden prever'),
+    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` : 'aún no se pueden prever'),
       libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
     fila(factor('Nota final'), `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
@@ -425,7 +441,8 @@ function pintarResumen() {
     seccion('¿Qué quieres ver?', el('ul', { class: 'lista' }, OBJETIVOS.map(o => {
       const r = resultado(estado.mirador, o);
       // Si no hay nota, el veredicto ya va en la pastilla: no repetirlo.
-      const sub = [r.puntos != null ? TITULO[r.color] : null, r.hora, r.marca].filter(Boolean).join(' · ');
+      const hora = o === 'Estrellas' && r.hora ? textoHora(o, r) : r.hora;
+      const sub = [r.puntos != null ? TITULO[r.color] : null, hora, r.marca].filter(Boolean).join(' · ');
       const nubes = r.prob_nubes != null ? `${r.prob_nubes} % de nubes` : null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => { estado.objetivo = o; pintarTodo(); irArriba(); } },
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
@@ -450,13 +467,13 @@ function pintarDetalle() {
 
   // Tarjeta del estado: veredicto, hora, nota y datos clave.
   const datosEstado = [];
-  if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que ${estado.objetivo === 'Salida de luna' ? 'la' : 'lo'} tapen las nubes</span>` }));
+  if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que las nubes ${TAPAN[estado.objetivo]}</span>` }));
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
   if (r.marca === '🎨') datosEstado.push(el('span', { class: 'dato ideal', html: svg('paleta', 15) + '<span>El cielo puede encenderse</span>' }));
   partes.push(el('div', { class: `estado ${r.color}` },
     el('div', { class: 'fila-estado' },
       el('div', {}, el('h3', {}, TITULO[r.color]),
-        el('span', { class: 'hora' }, r.hora ? `${mayuscula(VERBO[estado.objetivo])} a las ${r.hora}` : 'Ese día no se ve desde aquí')),
+        el('span', { class: 'hora' }, textoHora(estado.objetivo, r))),
       r.puntos != null ? el('div', { class: 'nota-puntos' }, el('strong', {}, coma(r.puntos)), el('span', {}, 'de 10')) : null),
     datosEstado.length ? el('div', { class: 'datos-estado' }, datosEstado) : null));
 
@@ -595,6 +612,35 @@ function pintarTodo() {
   guardarEnlace();
 }
 
+// --- Sin conexión (punto 4, 23-10-2026) --------------------------------------
+// El trabajador (sw.js) guarda la web, los datos y el mapa visto. Además le
+// pedimos el mapa de relieve alrededor de cada mirador (zoom 12 a 14), para
+// tenerlo en el mirador aunque no se haya mirado antes.
+function teselasDeLosMiradores() {
+  const urls = [];
+  for (const m of Object.values(datos.miradores)) {
+    for (const z of [12, 13, 14]) {
+      const n = 2 ** z, x = Math.floor((m.lon + 180) / 360 * n);
+      const lat = m.lat * Math.PI / 180;
+      const y = Math.floor((1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2 * n);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        urls.push(`https://${'abc'[(x + dx + y + dy) % 3]}.tile.opentopomap.org/${z}/${x + dx}/${y + dy}.png`);
+      }
+    }
+  }
+  return urls;
+}
+
+function prepararSinConexion() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready)
+    .then(reg => reg.active && reg.active.postMessage({ tipo: 'guardar-teselas', urls: teselasDeLosMiradores() }))
+    .catch(() => { /* sin trabajador: la web sigue funcionando con red */ });
+  // Al perder o recuperar la red, actualizar el aviso.
+  addEventListener('online', pintarTodo);
+  addEventListener('offline', pintarTodo);
+}
+
 // --- Arranque ----------------------------------------------------------------
 fetch('datos.json', { cache: 'no-cache' })
   .then(r => r.json())
@@ -622,6 +668,7 @@ fetch('datos.json', { cache: 'no-cache' })
     });
     conectarDeslizar();
     pintarTodo();
+    prepararSinConexion();
     if (estado.mirador) {
       const m = datos.miradores[estado.mirador];
       centrarEn(m.lat, m.lon, 12);
