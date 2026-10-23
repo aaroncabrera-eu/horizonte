@@ -347,7 +347,7 @@ function pintarMirador() {
   const r = resultado(estado.mirador, estado.objetivo);
   const [titulo, lugar] = partesNombre(m.nombre);
   const partes = [
-    el('button', { class: 'volver', onclick: cerrarMirador, html: svg('volver', 18) + '<span>Todos los miradores</span>' }),
+    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los miradores</span>' }),
     el('div', { class: 'cabeza-ficha' }, el('h2', {}, titulo),
       el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · '))),
     seccion('¿Cuándo?', botonesDias()),
@@ -416,10 +416,11 @@ function abrirMirador(clave, objetivo) {
   document.getElementById('contenido').scrollTop = 0;
 }
 
-function cerrarMirador() {
+// moverMapa: false para dejar el mapa donde está (al tocar el mapa).
+function cerrarMirador(moverMapa = true) {
   estado.mirador = null; estado.objetivo = null;
   pintarTodo();
-  verTenerife();
+  if (moverMapa) verTenerife();
 }
 
 // Esconder el panel para ver el mapa entero (y volver a sacarlo).
@@ -504,10 +505,10 @@ fetch('datos.json', { cache: 'no-cache' })
     });
     // Tocar la barra del panel recogido lo vuelve a abrir.
     // Tocar el mapa (Aaron, 23-10-2026): se cierra el panel y, si había un
-    // mirador abierto, se deselecciona y vuelven a verse todos.
+    // mirador abierto, se deselecciona; el mapa se queda donde estaba.
     mapa.on('click', () => {
       plegar(true);
-      if (estado.mirador) cerrarMirador();
+      if (estado.mirador) cerrarMirador(false);
     });
     document.querySelector('.cabecera').addEventListener('click', () => {
       if (Date.now() - arrastrado < 400) return;      // era un deslizamiento, no un toque
