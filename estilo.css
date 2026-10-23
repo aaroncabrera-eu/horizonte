@@ -75,6 +75,8 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 (Leaflet pone la opacidad en línea, por eso se esconden con visibility.) */
 .nombre-pin { visibility: hidden; pointer-events: none; }
 .con-nombres .nombre-pin { visibility: visible; }
+/* Pulsar el nombre abre el mirador, como el localizador. */
+.con-nombres .nombre-pin { pointer-events: auto; cursor: pointer; }
 
 /* --- Panel: abajo en el móvil, a la derecha en el ordenador ------------------ */
 .panel {
@@ -158,7 +160,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .punto.rojo { background: var(--rojo); }
 
 /* Lista de miradores: lo mejor de cada uno ese día. */
-.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .fila {
   width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
   padding: 12px; min-height: 68px; border-radius: var(--radio);
@@ -174,7 +176,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .fila .titulo { font-weight: 700; font-size: 15px; }
 .fila .sub { font-size: 13px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pastilla {
-  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 6px;
 }
 .pastilla.verde { background: var(--verde-fondo); color: var(--verde); }
@@ -239,3 +241,7 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .dibujo svg { width: 100%; height: auto; display: block; }
 .lectura { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; min-height: 2.9em; text-align: center; }
 .nota { font-size: 12px; color: var(--suave); line-height: 1.45; margin: 0; }
+
+/* Detalle de una opción: icono junto al título. */
+.cabeza-ficha h2 { display: flex; align-items: center; gap: 8px; }
+.cabeza-ficha h2 svg { color: var(--primario); flex-shrink: 0; }

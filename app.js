@@ -89,7 +89,7 @@ function mejorObjetivo(clave) {
 
 // --- Enlace: #mirador/fecha/objetivo -----------------------------------------
 function guardarEnlace() {
-  const partes = estado.mirador ? [estado.mirador, estado.dia, EN_ENLACE[estado.objetivo]] : [];
+  const partes = estado.mirador ? [estado.mirador, estado.dia, EN_ENLACE[estado.objetivo]].filter(Boolean) : [];
   history.replaceState(null, '', partes.length ? '#' + partes.join('/') : location.pathname);
 }
 function leerEnlace() {
@@ -97,7 +97,7 @@ function leerEnlace() {
   if (datos.dias.includes(dia)) estado.dia = dia;
   if (mirador in datos.miradores) {
     estado.mirador = mirador;
-    estado.objetivo = OBJETIVOS.find(o => EN_ENLACE[o] === objetivo) || mejorObjetivo(mirador).o;
+    estado.objetivo = OBJETIVOS.find(o => EN_ENLACE[o] === objetivo) || null;   // sin objetivo: resumen
   }
 }
 
@@ -153,8 +153,8 @@ function pintarMapa() {
   capaMiradores.clearLayers();
   for (const [clave, m] of Object.entries(datos.miradores)) {
     const elegido = clave === estado.mirador;
-    // Línea hacia donde sale o se pone lo elegido, solo en el mirador abierto.
-    if (elegido) {
+    // Línea hacia donde sale o se pone lo elegido, solo en el detalle.
+    if (elegido && estado.objetivo) {
       const r = resultado(clave, estado.objetivo);
       if (r.azimut != null) {
         L.polyline([[m.lat, m.lon], destino(m.lat, m.lon, r.azimut, 60)], {
@@ -170,7 +170,8 @@ function pintarMapa() {
     const vecino = Object.values(datos.miradores).some(o => o !== m &&
       o.lon > m.lon && o.lon - m.lon < 0.25 && Math.abs(o.lat - m.lat) < 0.06);
     L.marker([m.lat, m.lon], { icon: icono, title: m.nombre, keyboard: true, riseOnHover: true })
-      .bindTooltip(partesNombre(m.nombre)[0], { permanent: true, direction: vecino ? 'left' : 'right',
+      .bindTooltip(el('span', { onclick: ev => { L.DomEvent.stopPropagation(ev); abrirMirador(clave); } },
+        partesNombre(m.nombre)[0]), { permanent: true, direction: vecino ? 'left' : 'right',
         offset: vecino ? [-12, -24] : [12, -24], className: 'nombre-pin' })
       .on('click', () => abrirMirador(clave))
       .addTo(capaMiradores);
@@ -213,7 +214,7 @@ function pintarLista() {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
-      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, mejor.o) },
+      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
@@ -341,22 +342,49 @@ function conectarRueda(dibujo, lectura, m) {
   agarre.addEventListener('pointercancel', soltar);
 }
 
-// --- Vista mirador: elegir qué ver y el plan ---------------------------------
+// --- Vista mirador: resumen con las cuatro opciones o detalle de una ----------
+// (Aaron, 23-10-2026): al abrir un mirador, primero las cuatro tarjetas con
+// su nota; al tocar una, su pantalla con todo (y «← mirador» para volver).
 function pintarMirador() {
+  return estado.objetivo ? pintarDetalle() : pintarResumen();
+}
+
+function cabezaMirador(m) {
+  const [titulo, lugar] = partesNombre(m.nombre);
+  return el('div', { class: 'cabeza-ficha' }, el('h2', {}, titulo),
+    el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · ')));
+}
+
+function pintarResumen() {
+  const m = datos.miradores[estado.mirador];
+  return [
+    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los miradores</span>' }),
+    cabezaMirador(m),
+    seccion('¿Cuándo?', botonesDias()),
+    seccion('¿Qué quieres ver?', el('ul', { class: 'lista' }, OBJETIVOS.map(o => {
+      const r = resultado(estado.mirador, o);
+      // Si no hay nota, el veredicto ya va en la pastilla: no repetirlo.
+      const sub = [r.puntos != null ? TITULO[r.color] : null, r.hora, r.marca].filter(Boolean).join(' · ');
+      const nubes = r.prob_nubes != null ? `${r.prob_nubes} % de nubes` : null;
+      return el('li', {}, el('button', { class: 'fila', onclick: () => { estado.objetivo = o; pintarTodo(); irArriba(); } },
+        el('span', { class: 'icono-obj', html: svg(o, 20) }),
+        el('span', { class: 'texto' }, el('span', { class: 'titulo' }, CORTO[o] || o),
+          el('span', { class: 'sub' }, sub), nubes ? el('span', { class: 'sub' }, nubes) : null),
+        pastilla(r)));
+    }))),
+    el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
+  ];
+}
+
+function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
   const r = resultado(estado.mirador, estado.objetivo);
-  const [titulo, lugar] = partesNombre(m.nombre);
   const partes = [
-    el('button', { class: 'volver', onclick: () => cerrarMirador(), html: svg('volver', 18) + '<span>Todos los miradores</span>' }),
-    el('div', { class: 'cabeza-ficha' }, el('h2', {}, titulo),
-      el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · '))),
+    el('button', { class: 'volver', onclick: () => { estado.objetivo = null; pintarTodo(); irArriba(); },
+      html: svg('volver', 18) + `<span>${partesNombre(m.nombre)[0]}</span>` }),
+    el('div', { class: 'cabeza-ficha' }, el('h2', { html: svg(estado.objetivo, 24) + `<span>${CORTO[estado.objetivo] || estado.objetivo}</span>` }),
+      el('p', {}, partesNombre(m.nombre)[0])),
     seccion('¿Cuándo?', botonesDias()),
-    // Cada opción lleva un punto con su color ese día: se ve cuál está mejor.
-    seccion('¿Qué quieres ver?', el('div', { class: 'objetivos' }, OBJETIVOS.map(o => el('button', {
-      class: 'objetivo', 'aria-pressed': String(o === estado.objetivo),
-      onclick: () => { estado.objetivo = o; pintarTodo(); },
-    }, el('span', { class: `punto ${resultado(estado.mirador, o).color}`, title: TITULO[resultado(estado.mirador, o).color] }),
-       el('span', { html: svg(o, 22) }), CORTO[o] || o)))),
   ];
 
   // Tarjeta del estado: veredicto, hora, nota y datos clave.
@@ -406,13 +434,18 @@ function pintarMirador() {
   return partes;
 }
 
-function abrirMirador(clave, objetivo) {
+// Se abre en el resumen y en el día que estuviera elegido (Aaron, 23-10-2026).
+function abrirMirador(clave) {
   estado.mirador = clave;
-  estado.objetivo = objetivo || mejorObjetivo(clave).o;   // por defecto, lo mejor
+  estado.objetivo = null;
   plegar(false);
   pintarTodo();
   const m = datos.miradores[clave];
   centrarEn(m.lat, m.lon, Math.max(mapa.getZoom(), 12));
+  irArriba();
+}
+
+function irArriba() {
   document.getElementById('contenido').scrollTop = 0;
 }
 
