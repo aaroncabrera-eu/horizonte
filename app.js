@@ -181,7 +181,7 @@ function pintarMapa() {
       if (r.azimut != null) {
         L.polyline([[m.lat, m.lon], destino(m.lat, m.lon, r.azimut, 60)], {
           color: '#1D4E6B', weight: 4, opacity: 0.9, dashArray: '8 6' })
-          .bindTooltip(`${mayuscula(VERBO[estado.objetivo])}${r.hora ? ' · ' + r.hora : ''}`, {
+          .bindTooltip(`${mayuscula(VERBO[estado.objetivo])}${r.hora ? ' · ' + r.hora : ' · tapado por el relieve'}`, {
             permanent: true, direction: 'center', className: 'etiqueta-mapa' })
           .addTo(capaMiradores);
       }
@@ -460,9 +460,15 @@ function pintarDetalle() {
   const partes = [
     el('button', { class: 'volver', onclick: () => { estado.objetivo = null; pintarTodo(); irArriba(); },
       html: svg('volver', 18) + `<span>${partesNombre(m.nombre)[0]}</span>` }),
-    el('div', { class: 'cabeza-ficha' }, el('h2', { html: svg(estado.objetivo, 24) + `<span>${CORTO[estado.objetivo] || estado.objetivo}</span>` }),
-      el('p', {}, partesNombre(m.nombre)[0])),
+    cabezaMirador(m),
     seccion('¿Cuándo?', botonesDias()),
+    // Cambiar de opción sin volver al resumen (Aaron, 23-10-2026); cada una
+    // con un punto de su color ese día.
+    seccion('¿Qué quieres ver?', el('div', { class: 'objetivos' }, OBJETIVOS.map(o => el('button', {
+      class: 'objetivo', 'aria-pressed': String(o === estado.objetivo),
+      onclick: () => { estado.objetivo = o; pintarTodo(); },
+    }, el('span', { class: `punto ${resultado(estado.mirador, o).color}`, title: TITULO[resultado(estado.mirador, o).color] }),
+       el('span', { html: svg(o, 22) }), CORTO[o] || o)))),
   ];
 
   // Tarjeta del estado: veredicto, hora, nota y datos clave.
