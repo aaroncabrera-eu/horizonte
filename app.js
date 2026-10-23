@@ -270,7 +270,7 @@ function pintarLista() {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'rojo' ? 'Nada destacable ese día'
         : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + r.marca : ''}`;
-      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave) },
+      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' ? null : mejor.o) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
@@ -630,9 +630,11 @@ function pintarDetalle() {
 }
 
 // Se abre en el resumen y en el día que estuviera elegido (Aaron, 23-10-2026).
-function abrirMirador(clave) {
+// objetivo: desde la lista se entra directo a lo mejor de ese día (Aaron,
+// 23-10-2026); desde el mapa, al resumen con las cuatro opciones.
+function abrirMirador(clave, objetivo = null) {
   estado.mirador = clave;
-  estado.objetivo = null;
+  estado.objetivo = objetivo;
   plegar(false);
   pintarTodo();
   const m = datos.miradores[clave];
