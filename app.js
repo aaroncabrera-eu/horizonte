@@ -282,7 +282,6 @@ function pintarLista() {
 // que te tapa; el azul hacia dentro es el mar, que ves por debajo de la
 // horizontal porque estás en alto. Las alturas están exageradas.
 const RUEDA = { C: 180, HORIZONTAL: 112, DENTRO: 52 };
-const CUMBRES = ['Teide'];          // con nombre en la rueda
 
 function radio(m, h) {
   // Píxeles por grado: exagerado, pero que el más alto quepa en la rueda.
@@ -335,17 +334,16 @@ function pintarRueda(m, azimut) {
     const [x, y] = punto(az, 166);
     return `<text x="${x}" y="${y + 5}" font-size="15" font-weight="700" fill="#56657A" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif">${l}</text>`;
   }).join('');
-  // Las grandes cumbres, con su nombre en la rueda (Aaron, 23-10-2026: el
-  // Teide desde 500 escalones). Se marca el grado en que asoma más alto.
-  const cumbres = CUMBRES.map(nombre => {
-    const grados = m.delante.map((d, az) => d === nombre ? az : null).filter(az => az !== null);
-    if (!grados.length) return '';
-    const az = grados.reduce((a, b) => m.horizonte[b] > m.horizonte[a] ? b : a);
+  // El Teide, con su nombre en la rueda si se ve desde aquí (Aaron,
+  // 23-10-2026); m.teide es el grado en que asoma más alto.
+  let cumbres = '';
+  if (m.teide != null) {
+    const az = m.teide;
     const [x, y] = punto(az, radios[az] + 4);
     const [tx, ty] = punto(az, radios[az] + 16);
-    return `<path d="M${x - 6},${y + 4}L${x},${y - 7}L${x + 6},${y + 4}Z" fill="#5F6F52" stroke="#fff" stroke-width="1"/>` +
-      `<text x="${tx}" y="${ty}" font-size="12" font-weight="700" fill="#3E4A35" text-anchor="${az < 180 ? 'start' : 'end'}" font-family="Plus Jakarta Sans, sans-serif" paint-order="stroke" stroke="#EAF2F8" stroke-width="3">${nombre}</text>`;
-  }).join('');
+    cumbres = `<path d="M${x - 6},${y + 4}L${x},${y - 7}L${x + 6},${y + 4}Z" fill="#5F6F52" stroke="#fff" stroke-width="1"/>` +
+      `<text x="${tx}" y="${ty}" font-size="12" font-weight="700" fill="#3E4A35" text-anchor="${az < 180 ? 'start' : 'end'}" font-family="Plus Jakarta Sans, sans-serif" paint-order="stroke" stroke="#EAF2F8" stroke-width="3">Teide</text>`;
+  }
   let flecha = '';
   if (azimut != null) {
     const [x, y] = punto(azimut, 148);
@@ -420,12 +418,14 @@ const comas = texto => texto.replace(/(\d)\.(\d)/g, '$1,$2');
 function tablaNota(r) {
   const fila = (izq, der, clase = '') => el('div', { class: `fila-nota ${clase}` }, izq, el('span', { class: 'cifra' }, der));
   const factor = (nombre, texto) => el('span', {}, el('strong', {}, nombre), texto ? el('span', { class: 'explica' }, comas(mayuscula(texto))) : null);
-  const libre = r.prob_nubes != null ? (100 - r.prob_nubes) / 100 : null;
+  // En amanecer y atardecer las nubes quitan como mucho la mitad (peso_nubes).
+  const peso = r.peso_nubes ?? 1;
+  const libre = r.prob_nubes != null ? 1 - peso * r.prob_nubes / 100 : null;
   return el('div', { class: 'tabla-nota' },
     r.delante ? el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`) : null,
     r.desglose.map(d => fila(factor(d.factor, d.texto), d.max != null ? `${num(d.puntos)} / ${d.max}` : num(d.puntos))),
     fila(factor('Con el cielo despejado'), `${num(r.calidad)} / 10`, 'subtotal'),
-    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` : 'aún no se pueden prever'),
+    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` + (peso < 1 ? '; aunque lo tapen, quitan como mucho la mitad' : '') : 'aún no se pueden prever'),
       libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
     fila(factor('Nota final'), `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
@@ -441,7 +441,9 @@ function pintarMirador() {
 function cabezaMirador(m) {
   const [titulo, lugar] = partesNombre(m.nombre);
   return el('div', { class: 'cabeza-ficha' }, el('h2', {}, titulo),
-    el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · ')));
+    el('p', {}, [lugar, `${m.altitud} m`, `luz de ciudad: zona ${m.zona_luz}`].filter(Boolean).join(' · ')),
+    // Muy canario y llama la atención (Aaron, 23-10-2026).
+    m.teide != null ? el('span', { class: 'teide' }, el('span', { class: 'triangulo' }), 'Se ve el Teide') : null);
 }
 
 function pintarResumen() {
@@ -487,6 +489,9 @@ function pintarDetalle() {
   const datosEstado = [];
   if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que las nubes ${TAPAN[estado.objetivo]}</span>` }));
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
+  // El Teide cuenta ese día (despejado y aire limpio): +0,5 en la nota.
+  if ((r.desglose || []).some(d => d.factor === 'El Teide a la vista' && d.puntos > 0))
+    datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }), el('span', {}, 'Teide despejado')));
   if (r.marca === '🎨') datosEstado.push(el('span', { class: 'dato ideal', html: svg('paleta', 15) + '<span>El cielo puede encenderse</span>' }));
   partes.push(el('div', { class: `estado ${r.color}` },
     el('div', { class: 'fila-estado' },
