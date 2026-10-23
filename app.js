@@ -282,6 +282,7 @@ function pintarLista() {
 // que te tapa; el azul hacia dentro es el mar, que ves por debajo de la
 // horizontal porque estás en alto. Las alturas están exageradas.
 const RUEDA = { C: 180, HORIZONTAL: 112, DENTRO: 52 };
+const CUMBRES = ['Teide'];          // con nombre en la rueda
 
 function radio(m, h) {
   // Píxeles por grado: exagerado, pero que el más alto quepa en la rueda.
@@ -334,6 +335,17 @@ function pintarRueda(m, azimut) {
     const [x, y] = punto(az, 166);
     return `<text x="${x}" y="${y + 5}" font-size="15" font-weight="700" fill="#56657A" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif">${l}</text>`;
   }).join('');
+  // Las grandes cumbres, con su nombre en la rueda (Aaron, 23-10-2026: el
+  // Teide desde 500 escalones). Se marca el grado en que asoma más alto.
+  const cumbres = CUMBRES.map(nombre => {
+    const grados = m.delante.map((d, az) => d === nombre ? az : null).filter(az => az !== null);
+    if (!grados.length) return '';
+    const az = grados.reduce((a, b) => m.horizonte[b] > m.horizonte[a] ? b : a);
+    const [x, y] = punto(az, radios[az] + 4);
+    const [tx, ty] = punto(az, radios[az] + 16);
+    return `<path d="M${x - 6},${y + 4}L${x},${y - 7}L${x + 6},${y + 4}Z" fill="#5F6F52" stroke="#fff" stroke-width="1"/>` +
+      `<text x="${tx}" y="${ty}" font-size="12" font-weight="700" fill="#3E4A35" text-anchor="${az < 180 ? 'start' : 'end'}" font-family="Plus Jakarta Sans, sans-serif" paint-order="stroke" stroke="#EAF2F8" stroke-width="3">${nombre}</text>`;
+  }).join('');
   let flecha = '';
   if (azimut != null) {
     const [x, y] = punto(azimut, 148);
@@ -350,7 +362,7 @@ function pintarRueda(m, azimut) {
     ${cunas}
     <circle cx="${C}" cy="${C}" r="${DENTRO}" fill="#F4F6F8" stroke="#DCE2E8"/>
     <circle cx="${C}" cy="${C}" r="${HORIZONTAL}" fill="none" stroke="#13202E" stroke-width="1.2" stroke-dasharray="4 4"/>
-    ${letras}${flecha}
+    ${letras}${cumbres}${flecha}
     <g class="cursor" visibility="hidden">
       <line class="linea" x1="${C}" y1="${C}" x2="${C}" y2="${C}" stroke="#13202E" stroke-width="1.5"/>
       <circle class="bola" cx="${C}" cy="${C}" r="8" fill="#13202E" stroke="#fff" stroke-width="2"/>
