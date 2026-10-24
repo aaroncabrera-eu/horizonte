@@ -850,8 +850,11 @@ function pintarDetalle() {
   // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
   const paisaje = (r.partes || []).find(p => p.parte === 'Paisaje') || r.paisaje;
   const enPaisaje = t => paisaje && paisaje.pct > 0 && paisaje.claves.some(c => c.includes(t));
-  if (enPaisaje('Teide'))
-    datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }), el('span', {}, 'Teide despejado')));
+  // «Teide despejado» o, si no es seguro, con qué probabilidad se verá.
+  const teideClave = paisaje && paisaje.pct > 0 && paisaje.claves.find(c => c.includes('Teide'));
+  if (teideClave)
+    datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }),
+      el('span', {}, mayuscula(teideClave.replace(/^el /, '')))));
   if (enPaisaje('mar de nubes'))
     datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + '<span>Mar de nubes debajo</span>' }));
   const lluvia = (r.desglose || []).find(d => d.factor === 'Lluvia de estrellas');
