@@ -62,7 +62,7 @@ function rumbo(az) { return RUMBOS[Math.round(az / 22.5) % 16]; }
 const TENERIFE = [[27.99, -16.93], [28.60, -16.11]];
 
 let datos, mapa, capaMiradores;
-const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false };
+const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false, luna: null };
 
 // Crea un elemento con texto (nunca HTML) para no meter nada raro en la página.
 function el(etiqueta, atributos = {}, ...hijos) {
@@ -110,8 +110,24 @@ function yaPaso(r, dia) {
 }
 function resultado(clave, objetivo) {
   const r = datos.miradores[clave].dias[estado.dia][objetivo];
-  return yaPaso(r, estado.dia) ? { ...r, color: 'pasado', marca: '' } : r;
+  const conPasado = x => yaPaso(x, estado.dia) ? { ...x, color: 'pasado', marca: '' } : x;
+  if (objetivo !== 'Salida de luna' || !r.otra) return conPasado(r);
+  // Luna con salida y puesta (Aaron, 24-10-2026): manda la mejor, salvo que
+  // ya haya pasado y la otra no (la puesta del alba ya pasó, la salida de
+  // esta tarde aún no).
+  const a = conPasado(r), b = conPasado(r.otra);
+  return a.color === 'pasado' && b.color !== 'pasado' ? { ...b, otra: a } : { ...a, otra: b };
 }
+// La luna que se está viendo: la propuesta o la otra si se tocó en el selector.
+function resultadoVisto(clave, objetivo) {
+  const r = resultado(clave, objetivo);
+  if (objetivo !== 'Salida de luna' || !r.otra || !estado.luna) return r;
+  const quiere = estado.luna === 'puesta';
+  return Boolean(r.luna_pone) === quiere ? r : Boolean(r.otra.luna_pone) === quiere ? r.otra : r;
+}
+const tipoLuna = r => r.luna_pone ? 'puesta' : 'salida';
+// «Luna (puesta)» en listas y resúmenes, para que se sepa cuál es.
+const etiqueta = (o, r) => o === 'Salida de luna' && r && r.hora ? `Luna (${tipoLuna(r)})` : CORTO[o] || o;
 
 // Orden de «mejor a peor»: color, luego la nota y, si empatan, ⭐ o 🎨.
 function comparar(a, b) {
@@ -198,7 +214,7 @@ function pintarMapa() {
     const elegido = clave === estado.mirador;
     // Línea hacia donde sale o se pone lo elegido, solo en el detalle.
     if (elegido && estado.objetivo) {
-      const r = resultado(clave, estado.objetivo);
+      const r = resultadoVisto(clave, estado.objetivo);
       if (r.azimut != null) {
         L.polyline([[m.lat, m.lon], destino(m.lat, m.lon, r.azimut, 60)], {
           color: '#1D4E6B', weight: 4, opacity: 0.9, dashArray: '8 6' })
@@ -230,7 +246,7 @@ function botonesDias() {
   return el('div', { class: 'dias' }, datos.dias.map(d => {
     const [arriba, numero] = partesDia(d);
     return el('button', { class: 'dia', 'aria-pressed': String(d === estado.dia),
-      onclick: () => { estado.dia = d; pintarTodo(); } }, el('span', {}, arriba), el('strong', {}, numero));
+      onclick: () => { estado.dia = d; estado.luna = null; pintarTodo(); } }, el('span', {}, arriba), el('strong', {}, numero));
   }));
 }
 
@@ -290,7 +306,7 @@ function pintarLista() {
     filas.length ? seccion(lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
       const sub = r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
-        : `${CORTO[mejor.o] || mejor.o}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
+        : `${etiqueta(mejor.o, r)}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
       return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' || r.color === 'pasado' ? null : mejor.o) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
@@ -615,7 +631,7 @@ function pintarResumen() {
       const nubes = r.prob_nubes != null ? `${r.prob_nubes} % de nubes` : null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => { estado.objetivo = o; pintarTodo(); irArriba(); } },
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
-        el('span', { class: 'texto' }, el('span', { class: 'titulo' }, CORTO[o] || o),
+        el('span', { class: 'texto' }, el('span', { class: 'titulo' }, etiqueta(o, r)),
           el('span', { class: 'sub' }, sub), nubes ? el('span', { class: 'sub' }, nubes) : null),
         pastilla(r)));
     }))),
@@ -790,7 +806,7 @@ function seguridad(dia) {
 
 function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
-  const r = resultado(estado.mirador, estado.objetivo);
+  const r = resultadoVisto(estado.mirador, estado.objetivo);
   const partes = [
     // Atrás: a la lista de spots (o a las ocasiones), con el mapa donde está;
     // las cuatro opciones ya están arriba (Aaron, 23-10-2026).
@@ -806,6 +822,22 @@ function pintarDetalle() {
     }, el('span', { class: `punto ${resultado(estado.mirador, o).color}`, title: TITULO[resultado(estado.mirador, o).color] }),
        el('span', { html: svg(o, 22) }), CORTO[o] || o)))),
   ];
+
+  // Luna: salida y puesta del día, con su nota; se ve la propuesta y se puede
+  // tocar la otra (Aaron, 24-10-2026).
+  if (estado.objetivo === 'Salida de luna') {
+    const propuesta = resultado(estado.mirador, estado.objetivo);
+    const opciones = [propuesta, propuesta.otra].filter(x => x && x.hora)
+      .sort((x, y) => (x.luna_pone ? 0 : 1) - (y.luna_pone ? 0 : 1));    // el día: primero la puesta del alba
+    const boton = x => el('button', { class: 'opcion-luna', 'aria-pressed': String(tipoLuna(x) === tipoLuna(r)),
+      onclick: () => { estado.luna = tipoLuna(x); pintarTodo(); } },
+      el('strong', {}, `${mayuscula(tipoLuna(x))} ${x.hora}`),
+      el('span', {}, [x.color === 'pasado' ? 'ya pasó' : x.puntos != null ? `${coma(x.puntos)}/10` : TITULO[x.color], x.marca].filter(Boolean).join(' ')));
+    if (opciones.length) partes.push(opciones.length > 1
+      ? el('div', { class: 'selector-luna' }, opciones.map(boton))
+      : el('p', { class: 'nota-seccion' }, `Ese día solo se ve ${r.luna_pone ? 'ponerse' : 'salir'}: ` +
+          `${r.luna_pone ? 'la salida' : 'la puesta'} la tapa el relieve o cae fuera del día.`));
+  }
 
   // Tarjeta del estado: veredicto, hora, nota y datos clave.
   const datosEstado = [];
@@ -896,6 +928,7 @@ function pintarDetalle() {
 // 23-10-2026); desde el mapa, al resumen con las cuatro opciones.
 function abrirMirador(clave, objetivo = null) {
   estado.mirador = clave;
+  estado.luna = null;
   estado.objetivo = objetivo;
   plegar(false);
   pintarTodo();
