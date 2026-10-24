@@ -41,11 +41,13 @@ const TITULO = { verde: 'Merece la pena', amarillo: 'Regular', rojo: 'No merece 
 const ORDEN = { verde: 0, amarillo: 1, rojo: 2, pasado: 3 };
 const VERBO = { 'Salida de luna': 'sale la luna', 'Atardecer': 'se pone el sol',
                 'Amanecer': 'sale el sol', 'Estrellas': 'sin luna' };
+// La luna puede proponerse al salir o al ponerse (decisión 42).
+const verbo = (objetivo, r) => objetivo === 'Salida de luna' && r && r.luna_pone ? 'se pone la luna' : VERBO[objetivo];
 // Cuándo: «Sale la luna a las 18:02»; para las estrellas, si el rato es sin
 // luna o con ella toda la noche (Aaron, 23-10-2026: decía «sin luna» siempre).
 function textoHora(objetivo, r) {
   if (!r.hora) return objetivo === 'Estrellas' ? 'Esa noche no llega a oscurecer del todo' : 'Ese día no se ve desde aquí';
-  if (objetivo !== 'Estrellas') return `${mayuscula(VERBO[objetivo])} a las ${r.hora}`;
+  if (objetivo !== 'Estrellas') return `${mayuscula(verbo(objetivo, r))} a las ${r.hora}`;
   const [a, b] = r.hora.split('-');
   if (r.sin_luna === true) return `Sin luna de ${a} a ${b}`;
   if (r.sin_luna === false) return `Con luna toda la noche (${a} – ${b})`;
@@ -200,7 +202,7 @@ function pintarMapa() {
       if (r.azimut != null) {
         L.polyline([[m.lat, m.lon], destino(m.lat, m.lon, r.azimut, 60)], {
           color: '#1D4E6B', weight: 4, opacity: 0.9, dashArray: '8 6' })
-          .bindTooltip(`${mayuscula(VERBO[estado.objetivo])}${r.hora ? ' · ' + r.hora : ' · tapado por el relieve'}`, {
+          .bindTooltip(`${mayuscula(verbo(estado.objetivo, r))}${r.hora ? ' · ' + r.hora : ' · tapado por el relieve'}`, {
             permanent: true, direction: 'center', className: 'etiqueta-mapa' })
           .addTo(capaMiradores);
       }
@@ -549,19 +551,32 @@ const num = n => coma(Math.round(n * 10) / 10);
 // Decimales con coma también dentro de los textos: "0.64" → "0,64".
 const comas = texto => texto.replace(/(\d)\.(\d)/g, '$1,$2');
 
+// Amanecer y atardecer en tres partes (decisión 41): cielo, sol y paisaje,
+// cada una con su probabilidad; la nota, la de que salga bien al menos una.
+const PARTE_TITULO = { Cielo: 'Que el cielo se encienda', Sol: 'Que el sol toque algo bonito', Paisaje: 'Que luzca el paisaje' };
+function tablaPartes(r) {
+  const fila = (izq, der, clase = '') => el('div', { class: `fila-nota ${clase}` }, izq, el('span', { class: 'cifra' }, der));
+  return el('div', { class: 'tabla-nota' },
+    r.delante ? el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`) : null,
+    r.partes.map(p => fila(el('span', {}, el('strong', {}, PARTE_TITULO[p.parte] || p.parte),
+      el('span', { class: 'explica' }, comas(mayuscula(p.claves.join('; '))))), `${p.pct} %`)),
+    fila(el('span', {}, el('strong', {}, 'Nota final'),
+      el('span', { class: 'explica' }, 'Posibilidades de que salga bien al menos una de las tres')), `${num(r.puntos)} / 10`, 'total'),
+    (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
+}
+
 function tablaNota(r) {
   const fila = (izq, der, clase = '') => el('div', { class: `fila-nota ${clase}` }, izq, el('span', { class: 'cifra' }, der));
   const factor = (nombre, texto) => el('span', {}, el('strong', {}, nombre), texto ? el('span', { class: 'explica' }, comas(mayuscula(texto))) : null);
-  // En amanecer y atardecer las nubes quitan como mucho la mitad (peso_nubes).
-  const peso = r.peso_nubes ?? 1;
-  const libre = r.prob_nubes != null ? 1 - peso * r.prob_nubes / 100 : null;
+  const libre = r.prob_nubes != null ? 1 - r.prob_nubes / 100 : null;
   return el('div', { class: 'tabla-nota' },
     r.delante ? el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`) : null,
     r.desglose.map(d => fila(factor(d.factor, d.texto), d.max != null ? `${num(d.puntos)} / ${d.max}` : num(d.puntos))),
     fila(factor('Con el cielo despejado'), `${num(r.calidad)} / 10`, 'subtotal'),
-    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` + (peso < 1 ? '; aunque lo tapen, quitan como mucho la mitad' : '') : 'aún no se pueden prever'),
+    fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` : 'aún no se pueden prever'),
       libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
-    fila(factor('Nota final'), `${num(r.puntos)} / 10`, 'total'),
+    r.paisaje ? fila(factor('Además, el paisaje', r.paisaje.claves.join('; ')), `${r.paisaje.pct} %`) : null,
+    fila(factor('Nota final', r.paisaje ? 'La luna con sus nubes o, si no, el paisaje' : null), `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
 }
 
@@ -801,9 +816,11 @@ function pintarDetalle() {
   }
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
   // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
-  if ((r.desglose || []).some(d => d.factor === 'Paisaje' && d.texto.includes('Teide')))
+  const paisaje = (r.partes || []).find(p => p.parte === 'Paisaje') || r.paisaje;
+  const enPaisaje = t => paisaje && paisaje.pct > 0 && paisaje.claves.some(c => c.includes(t));
+  if (enPaisaje('Teide'))
     datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }), el('span', {}, 'Teide despejado')));
-  if ((r.desglose || []).some(d => d.factor === 'Mar de nubes debajo'))
+  if (enPaisaje('mar de nubes'))
     datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + '<span>Mar de nubes debajo</span>' }));
   const lluvia = (r.desglose || []).find(d => d.factor === 'Lluvia de estrellas');
   if (lluvia) datosEstado.push(el('span', { class: 'dato ideal', html: svg('meteoro', 15) + `<span>${lluvia.texto.split(' (')[0]}</span>` }));
@@ -848,12 +865,12 @@ function pintarDetalle() {
   partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Su horizonte: tú en el centro'), dibujo, lectura,
     el('p', { class: 'ayuda-rueda' }, 'Arrastra la bolita para ver qué hay en cada dirección.'),
     el('p', { class: 'nota' }, 'Visto desde arriba, con el norte arriba como en el mapa. ' +
-      (r.azimut != null ? `La flecha marca hacia dónde ${VERBO[estado.objetivo]} (${rumbo(r.azimut)}). ` : '') +
+      (r.azimut != null ? `La flecha marca hacia dónde ${verbo(estado.objetivo, r)} (${rumbo(r.azimut)}). ` : '') +
       'El círculo discontinuo es la horizontal: el verde que sobresale es relieve que te tapa; el azul, el mar. Alturas exageradas.')));
 
   // ¿Cómo se calcula la nota? (Aaron, 23-10-2026): tabla con los puntos de
   // cada factor; sin nota (estrellas o si no se ve), las frases de siempre.
-  const lista = r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
+  const lista = r.partes ? tablaPartes(r) : r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
   lista.hidden = true;
   const boton = el('button', { class: 'boton', 'aria-expanded': 'false', onclick: () => {
     const abrir = lista.hidden; lista.hidden = !abrir; boton.setAttribute('aria-expanded', String(abrir));
@@ -986,7 +1003,7 @@ const AYUDA = [
     texto: 'Un dibujo del horizonte de frente, como por la cámara: por dónde saldrá o se pondrá el sol o la luna cada 5 minutos, las nubes que da la previsión y la calima.',
     pie: 'Debajo, la rueda: todo tu horizonte visto desde arriba, con lo que tapa cada dirección (arrastra la bolita).' },
   { icono: 'nube', titulo: 'De dónde sale la nota',
-    texto: 'Del sitio (el mar o una montaña delante, el paisaje, la oscuridad del cielo…) y del tiempo: las nubes y la calima de la previsión, que solo es fiable unos 5 días.',
+    texto: 'En amaneceres y atardeceres mira tres cosas: que el cielo se encienda de colores, que el sol toque algo bonito (el mar, el Teide…) y que luzca el paisaje. La nota es la posibilidad de que salga bien al menos una. Las nubes y la calima vienen de la previsión, fiable unos 5 días.',
     pie: 'Para más adelante, mira «Próximas ocasiones»: lunas llenas, lluvias de estrellas, la Vía Láctea… Instálala en el móvil: funciona sin cobertura.' },
 ];
 const AYUDA_VISTA = 'horizonte-ayuda-vista';
