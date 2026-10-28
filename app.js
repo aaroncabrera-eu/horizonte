@@ -653,7 +653,7 @@ function pintarResumen() {
         pastilla(r)));
     }))),
     el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
-    cajaGaleria(estado.mirador),      // fotos de la gente (valoraciones.js)
+    cajaGaleria(estado.mirador),      // todas las fotos de la gente (valoraciones.js)
   ].filter(Boolean);
 }
 
@@ -918,6 +918,8 @@ function pintarDetalle() {
   if (r.color === 'pasado') partes.push(botonMejorar({ spot: estado.mirador, dia: estado.dia, objetivo: estado.objetivo }));
   const gente = cajaGente(estado.mirador, estado.dia, estado.objetivo, r);
   if (gente) partes.push(gente);
+  const fotos = cajaGaleria(estado.mirador, estado.objetivo);     // de cualquier día
+  if (fotos) partes.push(fotos);
 
   if (r.momentos && r.momentos.length) {
     partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Tu plan'),

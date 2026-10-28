@@ -36,7 +36,7 @@ async function cargarOpiniones() {
     if (!resp.ok) return;
     opiniones = {};
     for (const o of await resp.json()) opiniones[claveEvento(o.spot, o.fecha, o.objetivo)] = o;
-    if (estado.mirador && estado.objetivo) pintarTodo();
+    if (estado.mirador) pintarTodo();
   } catch { /* sin red */ }
 }
 
@@ -51,7 +51,7 @@ async function cargarGaleria() {
       method: 'POST', headers: { ...CABECERAS, 'Content-Type': 'application/json' }, body: '{"cuantas": 120}' });
     if (!resp.ok) return;
     galeria = await resp.json();
-    if (estado.mirador && !estado.objetivo) pintarTodo();
+    if (estado.mirador && estado.objetivo) pintarTodo();
   } catch { /* sin red */ }
 }
 
@@ -62,8 +62,10 @@ function nuestraNota(spot, fecha, objetivo) {
   return r && r.puntos != null ? r.puntos : null;
 }
 
-function cajaGaleria(spot) {
-  const fotos = galeria.filter(g => g.spot === spot);
+// En el resumen del spot, todas; dentro de cada sección, solo las suyas
+// (Aaron, 28-10-2026: que no se mezclen): las de atardecer en el atardecer…
+function cajaGaleria(spot, objetivo = null) {
+  const fotos = galeria.filter(g => g.spot === spot && (!objetivo || g.objetivo === objetivo));
   if (!fotos.length) return null;
   return el('div', { class: 'caja galeria' },
     el('h4', {}, 'Fotos de la gente'),
@@ -74,25 +76,24 @@ function cajaGaleria(spot) {
       return el('figure', {},
         el('a', { href: url, target: '_blank', rel: 'noopener' }, el('img', { src: url, alt: `${CORTO[g.objetivo] || g.objetivo} en ${partesNombre(datos.miradores[spot].nombre)[0]}`, loading: 'lazy' })),
         el('figcaption', {},
-          el('strong', {}, [CORTO[g.objetivo] || g.objetivo, cuando, g.hora_foto].filter(Boolean).join(' · ')),
+          el('strong', {}, [objetivo ? null : CORTO[g.objetivo] || g.objetivo, objetivo ? mayuscula(cuando) : cuando, g.hora_foto]
+            .filter(Boolean).join(' · ')),
           el('span', { class: 'comparar' },
             el('span', {}, 'La gente ', el('b', {}, coma(g.media))),
             nuestra != null ? el('span', {}, 'Nosotros ', el('b', {}, coma(nuestra))) : null)));
     })));
 }
 
-// «La gente que fue», dentro del evento: media, votos y fotos aprobadas.
+// «La gente que fue», dentro del evento: media y votos de ese día (las
+// fotos van en «Fotos de la gente», debajo).
 function cajaGente(spot, dia, objetivo, r) {
   const o = opiniones[claveEvento(spot, dia, objetivo)];
   if (!o) return null;
-  const fotos = (o.fotos || []).map(f => `${SUPABASE}/storage/v1/object/public/fotos/${f}`);
   return el('div', { class: 'caja gente' },
     el('h4', {}, 'La gente que fue'),
     el('div', { class: 'comparar-notas' },
       r.puntos != null ? el('span', {}, 'Nuestra nota ', el('strong', {}, coma(r.puntos))) : null,
-      el('span', {}, 'La gente ', el('strong', {}, coma(o.media)), ` (${o.votos} ${o.votos === 1 ? 'voto' : 'votos'})`)),
-    fotos.length ? el('div', { class: 'fotos-gente' }, fotos.map(u =>
-      el('a', { href: u, target: '_blank', rel: 'noopener' }, el('img', { src: u, alt: 'Foto de la gente', loading: 'lazy' })))) : null);
+      el('span', {}, 'La gente ', el('strong', {}, coma(o.media)), ` (${o.votos} ${o.votos === 1 ? 'voto' : 'votos'})`)));
 }
 
 // --- La foto -------------------------------------------------------------------
