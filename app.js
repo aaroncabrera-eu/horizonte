@@ -827,11 +827,21 @@ function hoyCanarias() {
   try { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Atlantic/Canary' }); }   // AAAA-MM-DD
   catch { return datos.dias[0]; }
 }
-function seguridad(dia) {
+// Con varios modelos del tiempo (decisión 47, 28-10-2026) manda lo peor de
+// las dos cosas: los días que faltan y si los modelos coinciden.
+const CLASES_SEGURIDAD = ['segura', 'media', 'floja'];
+const TEXTO_ACUERDO = {
+  alta: 'Previsión bastante segura: los modelos del tiempo coinciden',
+  media: 'Previsión con dudas: los modelos del tiempo no coinciden del todo',
+  baja: 'Previsión dudosa: los modelos del tiempo no se ponen de acuerdo',
+};
+function seguridad(dia, acuerdo) {
   const faltan = Math.round((new Date(dia + 'T12:00') - new Date(hoyCanarias() + 'T12:00')) / 86400e3);
-  if (faltan <= 1) return ['segura', 'Previsión bastante segura'];
-  if (faltan <= 3) return ['media', 'Previsión: puede cambiar algo'];
-  return ['floja', 'Previsión: puede cambiar bastante, revísala antes de ir'];
+  const porDias = faltan <= 1 ? 0 : faltan <= 3 ? 1 : 2;
+  const porModelos = acuerdo ? ['alta', 'media', 'baja'].indexOf(acuerdo.nivel) : -1;
+  if (porModelos >= porDias) return [CLASES_SEGURIDAD[porModelos], TEXTO_ACUERDO[acuerdo.nivel]];
+  return [CLASES_SEGURIDAD[porDias], ['Previsión bastante segura', 'Previsión: puede cambiar algo',
+    'Previsión: puede cambiar bastante, revísala antes de ir'][porDias]];
 }
 
 function pintarDetalle() {
@@ -877,7 +887,7 @@ function pintarDetalle() {
   const datosEstado = [];
   if (r.prob_nubes != null) datosEstado.push(el('span', { class: 'dato', html: svg('nube', 15) + `<span>${r.prob_nubes} % de que las nubes ${TAPAN[estado.objetivo]}</span>` }));
   if (r.prob_nubes != null && r.color !== 'pasado') {
-    const [clase, texto] = seguridad(estado.dia);
+    const [clase, texto] = seguridad(estado.dia, r.acuerdo);
     datosEstado.push(el('span', { class: `dato seguridad ${clase}`, html: svg('reloj', 15) + `<span>${texto}</span>` }));
   }
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
@@ -945,7 +955,13 @@ function pintarDetalle() {
 
   // ¿Cómo se calcula la nota? (Aaron, 23-10-2026): tabla con los puntos de
   // cada factor; sin nota (estrellas o si no se ve), las frases de siempre.
-  const lista = r.partes ? tablaPartes(r) : r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
+  const tabla = r.partes ? tablaPartes(r) : r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
+  // Qué dice cada modelo del tiempo (decisión 47).
+  const modelos = r.acuerdo && r.acuerdo.modelos ? el('p', { class: 'explica-modelos' },
+    'Nubes bajas según cada modelo del tiempo: ' +
+    Object.entries(r.acuerdo.modelos).map(([m, v]) => `${m} ${v} %`).join(', ') +
+    '. Usamos los cinco: la media para las nubes bajas y, para los colores, cuántos modelos los dan.') : null;
+  const lista = el('div', {}, tabla, modelos);
   lista.hidden = true;
   const boton = el('button', { class: 'boton', 'aria-expanded': 'false', onclick: () => {
     const abrir = lista.hidden; lista.hidden = !abrir; boton.setAttribute('aria-expanded', String(abrir));
