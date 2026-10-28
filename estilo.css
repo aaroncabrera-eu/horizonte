@@ -346,3 +346,14 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
   border-radius: 999px; border: 1px solid var(--borde); background: var(--tarjeta); font-size: 13px; font-weight: 700;
 }
 .opcion-filtro[aria-pressed="true"] { background: var(--primario); border-color: var(--primario); color: #fff; }
+/* Alternativas que se pueden tocar: llevan a ese spot o a ese día. */
+.alternativa { display: flex; flex-direction: column; }
+.alternativa.tocable {
+  flex-direction: row; align-items: center; gap: 10px; width: 100%; text-align: left;
+  margin-top: 8px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 12px;
+  background: var(--tarjeta); color: inherit; font: inherit; cursor: pointer;
+}
+.alternativa.tocable:hover { border-color: #b9c6d2; }
+.alternativa .texto { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.alternativa .ir { display: flex; color: var(--suave); transform: rotate(-90deg); }
+.alternativa .aun-no { font-size: 12px; color: var(--suave); }

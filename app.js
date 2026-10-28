@@ -940,13 +940,14 @@ function pintarDetalle() {
   partes.push(el('div', { class: 'caja' }, boton, lista));
 
   const alternativas = [];
-  if (r.otro_mirador) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Ese mismo día, desde otro spot'), r.otro_mirador));
+  if (r.otro_mirador) alternativas.push(...otrosSpots(r.otro_mirador).map(([clave, texto]) =>
+    alternativa('Ese mismo día, desde otro spot', texto, clave, estado.dia)));
   // Si el otro día bueno y el momento ideal coinciden, una sola vez.
   if (r.otro_dia && r.otro_dia === r.ideal) {
-    alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día (momento ideal)'), r.otro_dia));
+    alternativas.push(alternativa('Desde aquí, otro día (momento ideal)', r.otro_dia, estado.mirador, diaDe(r.otro_dia)));
   } else {
-    if (r.otro_dia) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Desde aquí, otro día'), r.otro_dia));
-    if (r.ideal) alternativas.push(el('div', { class: 'alternativa' }, el('strong', {}, 'Momento ideal más cercano'), r.ideal));
+    if (r.otro_dia) alternativas.push(alternativa('Desde aquí, otro día', r.otro_dia, estado.mirador, diaDe(r.otro_dia)));
+    if (r.ideal) alternativas.push(alternativa('Momento ideal más cercano', r.ideal, estado.mirador, diaDe(r.ideal)));
   }
   if (alternativas.length) partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Alternativas'), ...alternativas));
   partes.push(el('p', { class: 'pie' }, `El tiempo es una previsión y puede cambiar: revísalo el mismo día. Previsión del ${datos.generado}.`, sinTiempo()));
@@ -956,6 +957,38 @@ function pintarDetalle() {
 // Se abre en el resumen y en el día que estuviera elegido (Aaron, 23-10-2026).
 // objetivo: desde la lista se entra directo a lo mejor de ese día (Aaron,
 // 23-10-2026); desde el mapa, al resumen con las cuatro opciones.
+// Tarjeta de una alternativa (Aaron, 28-10-2026: al tocarla, te lleva a
+// ella). Solo se puede tocar si ese día tiene datos (los próximos 6 días); si
+// es más adelante, se queda como texto porque aún no hay nada que enseñar.
+function alternativa(titulo, texto, clave, dia) {
+  const contenido = [el('strong', {}, titulo), el('span', {}, texto)];
+  if (!dia || !datos.dias.includes(dia)) {
+    if (dia) contenido.push(el('span', { class: 'aun-no' }, 'Se podrá abrir cuando haya previsión (unos 5 días antes).'));
+    return el('div', { class: 'alternativa' }, ...contenido);
+  }
+  const objetivo = estado.objetivo;
+  return el('button', { class: 'alternativa tocable', onclick: () => { estado.dia = dia; abrirMirador(clave, objetivo); } },
+    el('span', { class: 'texto' }, ...contenido), el('span', { class: 'ir', html: svg('abajo', 18) }));
+}
+
+// «12-11-2026 (07:15) ⭐» → '2026-11-12'.
+function diaDe(texto) {
+  const m = /(\d\d)-(\d\d)-(\d{4})/.exec(texto);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+// «Jardina (Anaga) (07:11), Igueque (TF-24, cumbre) (07:20)» → una pareja
+// [clave, texto] por spot. Se busca por el nombre porque los nombres también
+// llevan comas y no se puede partir por ellas.
+function otrosSpots(texto) {
+  const sitios = Object.entries(datos.miradores)
+    .map(([clave, m]) => [clave, texto.indexOf(m.nombre)]).filter(([, i]) => i >= 0)
+    .sort((a, b) => a[1] - b[1]);
+  if (!sitios.length) return [[null, texto]];
+  return sitios.map(([clave, i], n) => [clave,
+    texto.slice(i, n + 1 < sitios.length ? sitios[n + 1][1] : undefined).replace(/,\s*$/, '')]);
+}
+
 function abrirMirador(clave, objetivo = null) {
   estado.mirador = clave;
   estado.luna = null;
