@@ -62,7 +62,7 @@ function rumbo(az) { return RUMBOS[Math.round(az / 22.5) % 16]; }
 const TENERIFE = [[27.99, -16.93], [28.60, -16.11]];
 
 let datos, mapa, capaMiradores;
-const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false, luna: null, filtro: null };
+const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false, luna: null, filtro: null, mejorar: false };
 
 // Crea un elemento con texto (nunca HTML) para no meter nada raro en la página.
 function el(etiqueta, atributos = {}, ...hijos) {
@@ -308,6 +308,7 @@ function pintarLista() {
     seccion('¿Cuándo?', botonesDias()),
     seccion('¿Qué quieres ver?', filtro),
     ocasionesVigentes().length ? ocasiones : null,
+    botonMejorar(),
     filas.length ? null : el('p', { class: 'vacio' }, 'No hay spots en esta parte del mapa.'),
     todos ? null : verTodos,
     filas.length ? seccion(estado.filtro ? `${CORTO[estado.filtro] || estado.filtro}${lejos ? ' en cada spot' : ' en esta zona del mapa'}`
@@ -317,14 +318,14 @@ function pintarLista() {
       const sub = estado.filtro ? [etiqueta(mejor.o, r), r.hora ? (r.color === 'pasado' ? 'ya pasó' : r.hora) : 'no se ve', marcaTexto(r.marca)].filter(Boolean).join(' · ')
         : r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
         : `${etiqueta(mejor.o, r)}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
-      // Tocar un spot abre su resumen con las cuatro opciones (Aaron,
-      // 28-10-2026: si no, solo se veía todo desde el mapa); con un filtro
-      // elegido, directo a esa opción.
-      const abrir = estado.filtro || null;
+      // Tocar un spot abre directamente su mejor opción (Aaron, 28-10-2026:
+      // se probó abrir el resumen y prefirió esto); si está en rojo o ya
+      // pasó, el resumen. Desde el detalle, «Todas las opciones» lleva a él.
+      const abrir = estado.filtro || !(r.color === 'rojo' || r.color === 'pasado') ? mejor.o : null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, abrir) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
-        pastilla(r)), r.color === 'pasado' ? botonValorar(clave, [mejor.o]) : null);   // solo si la fila ya pasó
+        pastilla(r)));
     }))) : null,
     el('p', { class: 'pie' }, `Toca un localizador o un spot para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ].filter(Boolean);
@@ -649,7 +650,7 @@ function pintarResumen() {
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, etiqueta(o, r)),
           el('span', { class: 'sub' }, sub), nubes ? el('span', { class: 'sub' }, nubes) : null),
-        pastilla(r)), botonValorar(estado.mirador, [o]));
+        pastilla(r)));
     }))),
     el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ];
@@ -901,9 +902,11 @@ function pintarDetalle() {
       r.puntos != null ? el('div', { class: 'nota-puntos' }, el('strong', {}, coma(r.puntos)), el('span', {}, 'de 10')) : null),
     datosEstado.length ? el('div', { class: 'datos-estado' }, datosEstado) : null));
   partes.push(acciones(m, r));
-  // Notas y fotos de la gente que fue (decisión 45, en valoraciones.js).
-  for (const caja of [cajaVotar(estado.mirador, estado.dia, estado.objetivo, r),
-    cajaGente(estado.mirador, estado.dia, estado.objetivo, r)]) if (caja) partes.push(caja);
+  // Notas y fotos de la gente que fue (decisión 45, en valoraciones.js): si
+  // ya pasó, el formulario rellenado con este evento.
+  if (r.color === 'pasado') partes.push(botonMejorar({ spot: estado.mirador, dia: estado.dia, objetivo: estado.objetivo }));
+  const gente = cajaGente(estado.mirador, estado.dia, estado.objetivo, r);
+  if (gente) partes.push(gente);
 
   if (r.momentos && r.momentos.length) {
     partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Tu plan'),
@@ -1089,8 +1092,8 @@ function pintarTodo() {
   // En el móvil, con un mirador abierto el panel sube más: la nota y Tu plan
   // se ven sin deslizar.
   document.getElementById('panel').classList.toggle('con-ficha', Boolean(estado.mirador));
-  document.getElementById('contenido').replaceChildren(...(estado.mirador ? pintarMirador()
-    : estado.ocasiones ? pintarOcasiones() : pintarLista()));
+  document.getElementById('contenido').replaceChildren(...(estado.mejorar ? pintarMejorar()
+    : estado.mirador ? pintarMirador() : estado.ocasiones ? pintarOcasiones() : pintarLista()));
   guardarEnlace();
 }
 

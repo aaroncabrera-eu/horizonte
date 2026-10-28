@@ -6,11 +6,9 @@ const SUPABASE = 'https://vsdnwwnsoluftmpxcatp.supabase.co';
 const SUPABASE_CLAVE = 'sb_publishable_4Z8ASKaoPrMF0EkSNl7v7w_fvIa4yGt';
 const CABECERAS = { apikey: SUPABASE_CLAVE, Authorization: 'Bearer ' + SUPABASE_CLAVE };
 const FOTO_LADO = 1600;            // px del lado largo: suficiente y pesa poco
+const DIAS_ATRAS = 3;              // hasta cuándo se puede valorar (Aaron: más reciente, más preciso)
 
 let opiniones = {};                // 'spot|fecha|objetivo' → {votos, media, fotos}
-const borrador = { nota: null, foto: null, permiso: false, enviando: false, error: '' };
-let borradorDe = '';               // de qué evento es el borrador
-
 const claveEvento = (spot, dia, objetivo) => `${spot}|${dia}|${objetivo}`;
 
 // Lo guardado en el móvil (puede fallar en modo privado: entonces no pasa nada).
@@ -42,7 +40,23 @@ async function cargarOpiniones() {
   } catch { /* sin red */ }
 }
 
-// La foto, más pequeña y en JPEG (las del móvil pesan 3-8 MB).
+// «La gente que fue», dentro del evento: media, votos y fotos aprobadas.
+function cajaGente(spot, dia, objetivo, r) {
+  const o = opiniones[claveEvento(spot, dia, objetivo)];
+  if (!o) return null;
+  const fotos = (o.fotos || []).map(f => `${SUPABASE}/storage/v1/object/public/fotos/${f}`);
+  return el('div', { class: 'caja gente' },
+    el('h4', {}, 'La gente que fue'),
+    el('div', { class: 'comparar-notas' },
+      r.puntos != null ? el('span', {}, 'Nuestra nota ', el('strong', {}, coma(r.puntos))) : null,
+      el('span', {}, 'La gente ', el('strong', {}, coma(o.media)), ` (${o.votos} ${o.votos === 1 ? 'voto' : 'votos'})`)),
+    fotos.length ? el('div', { class: 'fotos-gente' }, fotos.map(u =>
+      el('a', { href: u, target: '_blank', rel: 'noopener' }, el('img', { src: u, alt: 'Foto de la gente', loading: 'lazy' })))) : null);
+}
+
+// --- La foto -------------------------------------------------------------------
+// Más pequeña y en JPEG (las del móvil pesan 3-8 MB). Al redibujarla se pierden
+// los datos ocultos de la foto, también la ubicación: no se sube dónde estabas.
 function reducirFoto(archivo) {
   return new Promise((bien, mal) => {
     const img = new Image();
@@ -59,115 +73,147 @@ function reducirFoto(archivo) {
   });
 }
 
-// Primero la foto (si hay) y luego el voto con el nombre de la foto.
-async function enviarVoto(spot, dia, objetivo) {
+// Fecha y hora en que se hizo la foto ('2026:10:28 18:12:05'), si la guarda
+// (JPEG con datos EXIF); si no, null. Solo se usa para rellenar el formulario.
+async function fechaFoto(archivo) {
+  try {
+    const v = new DataView(await archivo.slice(0, 128 * 1024).arrayBuffer());
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    for (let p = 2; p + 4 < v.byteLength;) {
+      const marca = v.getUint16(p), largo = v.getUint16(p + 2);
+      if (marca === 0xFFE1 && v.getUint32(p + 4) === 0x45786966) {     // «Exif»
+        const t = p + 10, peq = v.getUint16(t) === 0x4949;            // orden de los bytes
+        const u16 = i => v.getUint16(t + i, peq), u32 = i => v.getUint32(t + i, peq);
+        const buscar = (ifd, etiqueta) => {
+          for (let n = u16(ifd), i = 0; i < n; i++)
+            if (u16(ifd + 2 + i * 12) === etiqueta) return u32(ifd + 2 + i * 12 + 8);
+          return null;
+        };
+        const exif = buscar(u32(4), 0x8769);                           // subcarpeta Exif
+        const pos = exif != null ? buscar(exif, 0x9003) : null;        // fecha original
+        return pos == null ? null : String.fromCharCode(...new Uint8Array(v.buffer, t + pos, 19));
+      }
+      p += 2 + largo;
+    }
+  } catch { /* foto rara: sin fecha */ }
+  return null;
+}
+
+// --- «Ayúdanos a mejorar» (Aaron, 28-10-2026) ----------------------------------
+// Un formulario siempre a mano: spot de la app (Aaron: por ahora sin «otro
+// sitio»), día (hasta 3 atrás), qué
+// fuiste a ver, nota y foto. Desde un evento viene ya rellenado.
+const formulario = {};
+let volverDe = null;               // dónde estabas, para volver
+
+function diasAtras() {
+  const hoy = new Date(hoyCanarias() + 'T12:00');
+  return Array.from({ length: DIAS_ATRAS + 1 }, (_, n) =>
+    new Date(hoy.getTime() - n * 86400e3).toLocaleDateString('sv-SE'));
+}
+
+function abrirMejorar(relleno = {}) {
+  volverDe = { mirador: estado.mirador, objetivo: estado.objetivo, ocasiones: estado.ocasiones, luna: estado.luna };
+  Object.keys(formulario).forEach(k => delete formulario[k]);
+  Object.assign(formulario, { spot: null, dia: hoyCanarias(), objetivo: null, nota: null,
+    foto: null, permiso: false, enviando: false, error: '', hecho: false }, relleno);
+  estado.mejorar = true;
+  plegar(false);
+  pintarTodo();
+  irArriba();
+}
+
+function cerrarMejorar() {
+  estado.mejorar = false;
+  Object.assign(estado, volverDe || {});
+  pintarTodo();
+  irArriba();
+}
+
+// Al elegir la foto: si sabe cuándo se hizo, rellena el día y, por la hora,
+// si era amanecer, atardecer o estrellas (lo que no hayas elegido ya).
+async function elegirFoto(archivo) {
+  formulario.foto = archivo || null;
+  const f = archivo && await fechaFoto(archivo);
+  if (f) {
+    const dia = f.slice(0, 10).replace(/:/g, '-'), hora = Number(f.slice(11, 13));
+    if (diasAtras().includes(dia)) formulario.dia = dia;
+    if (!formulario.objetivo) formulario.objetivo = hora < 12 ? 'Amanecer' : hora < 21 ? 'Atardecer' : 'Estrellas';
+  }
+  pintarTodo();
+}
+
+async function enviarFormulario() {
+  const f = formulario;
   let foto = null;
-  if (borrador.foto) {
+  if (f.foto) {
     foto = `${dispositivo()}-${Date.now()}.jpg`;
     const resp = await fetch(`${SUPABASE}/storage/v1/object/fotos/${foto}`, {
       method: 'POST', headers: { ...CABECERAS, 'Content-Type': 'image/jpeg' },
-      body: await reducirFoto(borrador.foto) });
+      body: await reducirFoto(f.foto) });
     if (!resp.ok) throw new Error('No se pudo subir la foto');
   }
   const resp = await fetch(`${SUPABASE}/rest/v1/valoraciones`, {
     method: 'POST', headers: { ...CABECERAS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ spot, fecha: dia, objetivo, nota: borrador.nota, dispositivo: dispositivo(),
-      foto, permiso_foto: !!foto }) });
-  // 409 = este móvil ya había votado: se da por bueno.
-  if (!resp.ok && resp.status !== 409) throw new Error('No se pudo guardar tu nota');
+    body: JSON.stringify({ spot: f.spot,
+      fecha: f.dia, objetivo: f.objetivo, nota: f.nota, dispositivo: dispositivo(), foto, permiso_foto: !!foto }) });
+  if (resp.status === 409) throw new Error('Ya habías valorado eso mismo desde este móvil');
+  if (!resp.ok) throw new Error('No se pudo guardar tu nota');
 }
 
-// «La gente que fue»: media, votos y fotos aprobadas (si hay alguno).
-function cajaGente(spot, dia, objetivo, r) {
-  const o = opiniones[claveEvento(spot, dia, objetivo)];
-  if (!o) return null;
-  const fotos = (o.fotos || []).map(f => `${SUPABASE}/storage/v1/object/public/fotos/${f}`);
-  return el('div', { class: 'caja gente' },
-    el('h4', {}, 'La gente que fue'),
-    el('div', { class: 'comparar-notas' },
-      r.puntos != null ? el('span', {}, 'Nuestra nota ', el('strong', {}, coma(r.puntos))) : null,
-      el('span', {}, 'La gente ', el('strong', {}, coma(o.media)), ` (${o.votos} ${o.votos === 1 ? 'voto' : 'votos'})`)),
-    fotos.length ? el('div', { class: 'fotos-gente' }, fotos.map(u =>
-      el('a', { href: u, target: '_blank', rel: 'noopener' }, el('img', { src: u, alt: 'Foto de la gente', loading: 'lazy' })))) : null);
+// Grupo de botones en el que se elige uno (spot, día, qué, nota).
+function eleccion(clase, opciones, actual, elegir) {
+  return el('div', { class: clase }, opciones.map(([valor, texto]) => el('button', {
+    class: 'opcion-filtro', 'aria-pressed': String(actual === valor),
+    onclick: () => { elegir(valor); pintarTodo(); } }, texto)));
 }
 
-// «¿Fuiste? Pon tu nota»: solo cuando el evento ya pasó (hoy, después de su
-// hora), que es cuando se puede saber cómo estuvo.
-function cajaVotar(spot, dia, objetivo, r) {
-  if (r.color !== 'pasado') return null;
-  const k = claveEvento(spot, dia, objetivo);
-  const ya = leerLocal('horizonte-voto-' + k);
-  if (ya != null) return el('div', { class: 'caja votar' }, el('h4', {}, '¿Fuiste?'),
-    el('p', { class: 'gracias' }, `¡Gracias! Tu nota: ${ya}. Nos ayuda a acertar más.`));
-  if (borradorDe !== k) {           // otro evento: borrador nuevo
-    Object.assign(borrador, { nota: null, foto: null, permiso: false, enviando: false, error: '' });
-    borradorDe = k;
-  }
+function pintarMejorar() {
+  const f = formulario;
+  const volver = el('button', { class: 'volver', onclick: cerrarMejorar, html: svg('volver', 18) + '<span>Volver</span>' });
+  if (f.hecho) return [volver, el('div', { class: 'cabeza-ficha' }, el('h2', {}, '¡Gracias!'),
+    el('p', {}, 'Con lo que nos cuentas comparamos la nota con lo que pasó de verdad y la afinamos.' +
+      (f.foto ? ' Tu foto saldrá en la app cuando la revisemos.' : ''))),
+    el('button', { class: 'enviar-voto', onclick: () => abrirMejorar() }, 'Valorar otra salida')];
 
-  const repintar = () => pintarTodo();
-  const notas = el('div', { class: 'notas-voto' }, Array.from({ length: 11 }, (_, n) => el('button', {
-    class: 'nota-voto', 'aria-pressed': String(borrador.nota === n),
-    onclick: () => { borrador.nota = n; repintar(); } }, String(n))));
-  const elegir = el('input', { type: 'file', accept: 'image/*', hidden: '',
-    onchange: e => { borrador.foto = e.target.files[0] || null; repintar(); } });
-  const fotoBoton = el('button', { class: 'boton-foto', onclick: () => elegir.click() },
-    borrador.foto ? `Foto: ${borrador.foto.name}` : 'Añadir una foto (opcional)');
-  const permiso = borrador.foto ? el('label', { class: 'permiso' },
-    el('input', { type: 'checkbox', ...(borrador.permiso ? { checked: '' } : {}),
-      onchange: e => { borrador.permiso = e.target.checked; repintar(); } }),
-    el('span', {}, 'Acepto que la foto se publique en Horizonte (la revisamos antes)')) : null;
-  const listo = borrador.nota != null && (!borrador.foto || borrador.permiso) && !borrador.enviando;
-  const enviar = el('button', { class: 'enviar-voto', ...(listo ? {} : { disabled: '' }), onclick: async () => {
-    borrador.enviando = true; borrador.error = ''; repintar();
-    try {
-      await enviarVoto(spot, dia, objetivo);
-      guardarLocal('horizonte-voto-' + k, String(borrador.nota));
-      borrador.enviando = false;
-      await cargarOpiniones();
-    } catch (e) { borrador.error = e.message; borrador.enviando = false; }
-    repintar();
-  } }, borrador.enviando ? 'Enviando…' : 'Enviar');
+  const nombres = { 0: 'Hoy', 1: 'Ayer', 2: 'Anteayer' };
+  const dias = diasAtras().map((d, n) => [d, nombres[n] ||
+    new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })]);
+  const spots = Object.entries(datos.miradores).map(([clave, m]) => [clave, partesNombre(m.nombre)[0]]);
+  const listo = f.spot && f.objetivo && f.nota != null &&
+    (!f.foto || f.permiso) && !f.enviando;
+  const archivo = el('input', { type: 'file', accept: 'image/*', hidden: '', onchange: e => elegirFoto(e.target.files[0]) });
 
-  return el('div', { class: 'caja votar' },
-    el('h4', {}, '¿Fuiste? Pon tu nota'),
-    el('p', { class: 'nota-seccion' }, `¿Cómo estuvo, del 0 al 10? Así vemos si acertamos.`),
-    notas, elegir, fotoBoton, permiso, enviar,
-    borrador.error ? el('p', { class: 'error-voto' }, borrador.error + '. Prueba otra vez.') : null,
-    el('p', { class: 'pie' }, 'No guardamos tu nombre ni nada que te identifique. Las fotos solo se publican después de revisarlas.'));
+  return [
+    volver,
+    el('div', { class: 'cabeza-ficha' }, el('h2', {}, 'Ayúdanos a mejorar'),
+      el('p', {}, '¿Fuiste a ver un amanecer, un atardecer, la luna o las estrellas? Cuéntanos cómo estuvo: así vemos si la nota acertó.')),
+    seccion('Foto (opcional)', archivo,
+      el('button', { class: 'boton-foto', onclick: () => archivo.click() }, f.foto ? `Foto: ${f.foto.name}` : 'Elegir una foto'),
+      f.foto ? el('label', { class: 'permiso' },
+        el('input', { type: 'checkbox', ...(f.permiso ? { checked: '' } : {}), onchange: e => { f.permiso = e.target.checked; pintarTodo(); } }),
+        el('span', {}, 'Acepto que la foto se publique en Horizonte (la revisamos antes)')) : null),
+    seccion('¿Dónde?', eleccion('filtro', spots, f.spot, v => { f.spot = v; })),
+    seccion('¿Cuándo?', eleccion('filtro', dias, f.dia, v => { f.dia = v; })),
+    seccion('¿Qué fuiste a ver?', eleccion('filtro', OBJETIVOS.map(o => [o, CORTO[o] || o]), f.objetivo, v => { f.objetivo = v; })),
+    seccion('¿Cómo estuvo, del 0 al 10?', eleccion('notas-voto', Array.from({ length: 11 }, (_, n) => [n, String(n)]), f.nota, v => { f.nota = v; })),
+    el('button', { class: 'enviar-voto', ...(listo ? {} : { disabled: '' }), onclick: async () => {
+      f.enviando = true; f.error = ''; pintarTodo();
+      try {
+        await enviarFormulario();
+        f.hecho = true;
+        cargarOpiniones();
+      } catch (e) { f.error = e.message; }
+      f.enviando = false;
+      pintarTodo(); irArriba();
+    } }, f.enviando ? 'Enviando…' : 'Enviar'),
+    f.error ? el('p', { class: 'error-voto' }, f.error + '.') : null,
+    el('p', { class: 'pie' }, `Se puede valorar hasta ${DIAS_ATRAS} días atrás. No guardamos tu nombre ni nada que te identifique; de la foto no se sube dónde estabas.`),
+  ].filter(Boolean);
 }
 
-// --- Atajo «¿Fuiste? Pon tu nota» en las listas (Aaron, 28-10-2026: había
-// que entrar en el spot, la opción y la salida o puesta para encontrarlo).
-// Más adelante (apuntado, opción C): además, un aviso arriba con los eventos
-// que abriste, que siga saliendo a la mañana siguiente.
-
-// Los eventos de hoy de ese spot que ya pasaron y aún no votaste desde este
-// móvil, del más reciente al más antiguo. Las estrellas no: acaban de día.
-function pasadosHoy(clave, objetivos = ['Amanecer', 'Atardecer', 'Salida de luna']) {
-  if (estado.dia !== hoyCanarias()) return [];
-  const lista = [];
-  for (const o of objetivos) {
-    const r = resultado(clave, o);
-    for (const x of [r, r.otra]) if (x && x.color === 'pasado' &&
-      leerLocal('horizonte-voto-' + claveEvento(clave, estado.dia, o)) == null) lista.push({ o, r: x });
-  }
-  return lista.sort((a, b) => b.r.hora.localeCompare(a.r.hora));
-}
-
-// Abre el evento (en la luna, la salida o puesta que pasó) y baja hasta el
-// apartado de votar.
-function irAValorar(clave, o, r) {
-  abrirMirador(clave, o);
-  if (o === 'Salida de luna') { estado.luna = tipoLuna(r); pintarTodo(); }
-  const caja = document.querySelector('.votar');
-  if (caja) caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Botón bajo la fila de la lista; null si no hay nada que valorar.
-function botonValorar(clave, objetivos) {
-  const [p] = pasadosHoy(clave, objetivos);
-  if (!p) return null;
-  const que = p.o === 'Salida de luna' ? `la ${tipoLuna(p.r)} de la luna` : `el ${p.o.toLowerCase()}`;
-  return el('button', { class: 'valorar', onclick: () => irAValorar(clave, p.o, p.r) },
-    el('span', { html: svg('chispa', 14) }), `¿Fuiste a ver ${que}? Pon tu nota`);
+// Botón para abrirlo: en la lista, vacío; en un evento que ya pasó, rellenado.
+function botonMejorar(relleno) {
+  return el('button', { class: 'ver-todos', onclick: () => abrirMejorar(relleno),
+    html: svg('chispa', 16) + `<span>${relleno ? '¿Fuiste? Cuéntanos cómo estuvo' : 'Ayúdanos a mejorar'}</span>` });
 }
