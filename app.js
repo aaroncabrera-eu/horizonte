@@ -321,7 +321,7 @@ function pintarLista() {
       return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, abrir) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
-        pastilla(r)));
+        pastilla(r)), r.color === 'pasado' ? botonValorar(clave, [mejor.o]) : null);   // solo si la fila ya pasó
     }))) : null,
     el('p', { class: 'pie' }, `Toca un localizador o un spot para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ].filter(Boolean);
@@ -646,7 +646,7 @@ function pintarResumen() {
         el('span', { class: 'icono-obj', html: svg(o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, etiqueta(o, r)),
           el('span', { class: 'sub' }, sub), nubes ? el('span', { class: 'sub' }, nubes) : null),
-        pastilla(r)));
+        pastilla(r)), botonValorar(estado.mirador, [o]));
     }))),
     el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
   ];

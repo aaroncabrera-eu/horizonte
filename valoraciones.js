@@ -135,3 +135,39 @@ function cajaVotar(spot, dia, objetivo, r) {
     borrador.error ? el('p', { class: 'error-voto' }, borrador.error + '. Prueba otra vez.') : null,
     el('p', { class: 'pie' }, 'No guardamos tu nombre ni nada que te identifique. Las fotos solo se publican después de revisarlas.'));
 }
+
+// --- Atajo «¿Fuiste? Pon tu nota» en las listas (Aaron, 28-10-2026: había
+// que entrar en el spot, la opción y la salida o puesta para encontrarlo).
+// Más adelante (apuntado, opción C): además, un aviso arriba con los eventos
+// que abriste, que siga saliendo a la mañana siguiente.
+
+// Los eventos de hoy de ese spot que ya pasaron y aún no votaste desde este
+// móvil, del más reciente al más antiguo. Las estrellas no: acaban de día.
+function pasadosHoy(clave, objetivos = ['Amanecer', 'Atardecer', 'Salida de luna']) {
+  if (estado.dia !== hoyCanarias()) return [];
+  const lista = [];
+  for (const o of objetivos) {
+    const r = resultado(clave, o);
+    for (const x of [r, r.otra]) if (x && x.color === 'pasado' &&
+      leerLocal('horizonte-voto-' + claveEvento(clave, estado.dia, o)) == null) lista.push({ o, r: x });
+  }
+  return lista.sort((a, b) => b.r.hora.localeCompare(a.r.hora));
+}
+
+// Abre el evento (en la luna, la salida o puesta que pasó) y baja hasta el
+// apartado de votar.
+function irAValorar(clave, o, r) {
+  abrirMirador(clave, o);
+  if (o === 'Salida de luna') { estado.luna = tipoLuna(r); pintarTodo(); }
+  const caja = document.querySelector('.votar');
+  if (caja) caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Botón bajo la fila de la lista; null si no hay nada que valorar.
+function botonValorar(clave, objetivos) {
+  const [p] = pasadosHoy(clave, objetivos);
+  if (!p) return null;
+  const que = p.o === 'Salida de luna' ? `la ${tipoLuna(p.r)} de la luna` : `el ${p.o.toLowerCase()}`;
+  return el('button', { class: 'valorar', onclick: () => irAValorar(clave, p.o, p.r) },
+    el('span', { html: svg('chispa', 14) }), `¿Fuiste a ver ${que}? Pon tu nota`);
+}
