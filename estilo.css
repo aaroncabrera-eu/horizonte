@@ -339,3 +339,10 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 }
 .opcion-luna span { color: var(--suave); font-size: 13px; }
 .opcion-luna[aria-pressed="true"] { border: 2px solid var(--primario); padding: 9px 11px; background: var(--primario-claro); }
+/* Filtro de la lista: Todo, Luna, Atardecer, Amanecer, Estrellas. */
+.filtro { display: flex; flex-wrap: wrap; gap: 6px; }
+.opcion-filtro {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--borde); background: var(--tarjeta); font-size: 13px; font-weight: 700;
+}
+.opcion-filtro[aria-pressed="true"] { background: var(--primario); border-color: var(--primario); color: #fff; }

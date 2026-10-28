@@ -62,7 +62,7 @@ function rumbo(az) { return RUMBOS[Math.round(az / 22.5) % 16]; }
 const TENERIFE = [[27.99, -16.93], [28.60, -16.11]];
 
 let datos, mapa, capaMiradores;
-const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false, luna: null };
+const estado = { dia: null, mirador: null, objetivo: null, ocasiones: false, luna: null, filtro: null };
 
 // Crea un elemento con texto (nunca HTML) para no meter nada raro en la página.
 function el(etiqueta, atributos = {}, ...hijos) {
@@ -138,6 +138,8 @@ function comparar(a, b) {
 // Lo mejor que se puede ver en un mirador ese día (si empatan, en el orden
 // de OBJETIVOS).
 function mejorObjetivo(clave) {
+  // Con un filtro elegido en la lista (Aaron, 28-10-2026), solo esa opción.
+  if (estado.filtro) return { o: estado.filtro, i: 0, r: resultado(clave, estado.filtro) };
   return OBJETIVOS.map((o, i) => ({ o, i, r: resultado(clave, o) }))
     .sort((a, b) => comparar(a.r, b.r) || a.i - b.i)[0];
 }
@@ -298,16 +300,25 @@ function pintarLista() {
     html: svg('mapa', 16) + '<span>Ver todos los spots</span>' });
   const ocasiones = el('button', { class: 'ver-todos', onclick: () => { estado.ocasiones = true; pintarTodo(); irArriba(); },
     html: svg('calendario', 16) + '<span>Próximas ocasiones</span>' });
+  const filtro = el('div', { class: 'filtro' }, [null, ...OBJETIVOS].map(o => el('button', {
+    class: 'opcion-filtro', 'aria-pressed': String(estado.filtro === o),
+    onclick: () => { estado.filtro = o; refrescarLista(); },
+  }, o ? el('span', { html: svg(o, 16) }) : null, o ? CORTO[o] || o : 'Todo')));
   return [
     seccion('¿Cuándo?', botonesDias()),
-    datos.ocasiones && datos.ocasiones.length ? ocasiones : null,
+    seccion('¿Qué quieres ver?', filtro),
+    ocasionesVigentes().length ? ocasiones : null,
     filas.length ? null : el('p', { class: 'vacio' }, 'No hay spots en esta parte del mapa.'),
     todos ? null : verTodos,
-    filas.length ? seccion(lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
+    filas.length ? seccion(estado.filtro ? `${CORTO[estado.filtro] || estado.filtro}${lejos ? ' en cada spot' : ' en esta zona del mapa'}`
+      : lejos ? 'Lo mejor de cada spot' : 'Lo mejor en esta zona del mapa', el('ul', { class: 'lista' }, filas.map(({ clave, mejor }) => {
       const m = datos.miradores[clave], r = mejor.r;
-      const sub = r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
+      // Con filtro se dice siempre cómo está esa opción (aunque sea roja).
+      const sub = estado.filtro ? [etiqueta(mejor.o, r), r.hora ? (r.color === 'pasado' ? 'ya pasó' : r.hora) : 'no se ve', marcaTexto(r.marca)].filter(Boolean).join(' · ')
+        : r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
         : `${etiqueta(mejor.o, r)}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
-      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, r.color === 'rojo' || r.color === 'pasado' ? null : mejor.o) },
+      const abrir = estado.filtro || !(r.color === 'rojo' || r.color === 'pasado') ? mejor.o : null;
+      return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, abrir) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
         pastilla(r)));
@@ -575,9 +586,10 @@ function tablaPartes(r) {
   return el('div', { class: 'tabla-nota' },
     r.delante ? el('p', { class: 'delante' }, `Delante: ${comas(r.delante)} (horizonte a ${r.horizonte >= 0 ? '+' : ''}${num(r.horizonte)}°)`) : null,
     r.partes.map(p => fila(el('span', {}, el('strong', {}, PARTE_TITULO[p.parte] || p.parte),
-      el('span', { class: 'explica' }, comas(mayuscula(p.claves.join('; '))))), `${p.pct} %`)),
+      el('span', { class: 'explica' }, comas(mayuscula(p.claves.join('; '))))), `${num(p.nota ?? p.pct / 10)} / 10`)),
     fila(el('span', {}, el('strong', {}, 'Nota final'),
-      el('span', { class: 'explica' }, 'Posibilidades de que salga bien al menos una de las tres')), `${num(r.puntos)} / 10`, 'total'),
+      el('span', { class: 'explica' }, 'La mejor de las tres más un cuarto de las otras: un cielo bonito compensa que no se vea el sol, y al revés')),
+      `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
 }
 
@@ -591,8 +603,9 @@ function tablaNota(r) {
     fila(factor('Con el cielo despejado'), `${num(r.calidad)} / 10`, 'subtotal'),
     fila(factor('Nubes', libre != null ? `${r.prob_nubes} % de que ${TAPAN[estado.objetivo]}` : 'aún no se pueden prever'),
       libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
-    r.paisaje ? fila(factor('Además, el paisaje', r.paisaje.claves.join('; ')), `${r.paisaje.pct} %`) : null,
-    fila(factor('Nota final', r.paisaje ? 'La luna con sus nubes o, si no, el paisaje' : null), `${num(r.puntos)} / 10`, 'total'),
+    r.paisaje && r.nota_luna != null ? fila(factor('La luna, con sus nubes'), `${num(r.nota_luna)} / 10`, 'subtotal') : null,
+    r.paisaje ? fila(factor('Además, el paisaje', r.paisaje.claves.join('; ')), `${num(r.paisaje.nota ?? r.paisaje.pct / 10)} / 10`) : null,
+    fila(factor('Nota final', r.paisaje ? 'La mejor de las dos más un cuarto de la otra' : null), `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
 }
 
@@ -757,6 +770,18 @@ function iconoOcasion(tipo) {
   return el('span', { class: 'icono-obj', html: svg(tipo === 'lluvia' ? 'meteoro' : 'galaxia', 20) });
 }
 
+// Sin las que ya pasaron (Aaron, 28-10-2026: salía la luna de hoy ya pasada):
+// las de días anteriores y, si son de hoy, 20 min después de su hora.
+function ocasionesVigentes() {
+  const hoy = hoyCanarias();
+  return (datos.ocasiones || []).filter(o => {
+    if ((o.hasta || o.fecha) < hoy) return false;
+    if (!o.hasta && o.hora && !o.hora.includes('-') && o.fecha === hoy)
+      return instante(o.fecha, o.hora).getTime() + MARGEN_PASADO_MIN * 60e3 > Date.now();
+    return true;
+  });
+}
+
 function pintarOcasiones() {
   // Dos partes (Aaron, 24-10-2026): las que caen en los días con previsión
   // (se pueden abrir) y, por meses, las que aún no la tienen.
@@ -772,7 +797,8 @@ function pintarOcasiones() {
       ? el('button', { class: 'fila', onclick: () => { estado.dia = dia; estado.ocasiones = false; abrirMirador(o.spot, OBJETIVO_DE[o.objetivo]); } }, ...contenido)
       : el('div', { class: 'fila sin-prevision' }, ...contenido));
   };
-  const ya = datos.ocasiones.filter(diaCon), luego = datos.ocasiones.filter(o => !diaCon(o));
+  const vigentes = ocasionesVigentes();
+  const ya = vigentes.filter(diaCon), luego = vigentes.filter(o => !diaCon(o));
   const porMes = {};
   for (const o of luego) {
     const mes = new Date(o.fecha + 'T12:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -849,9 +875,10 @@ function pintarDetalle() {
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
   // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
   const paisaje = (r.partes || []).find(p => p.parte === 'Paisaje') || r.paisaje;
-  const enPaisaje = t => paisaje && paisaje.pct > 0 && paisaje.claves.some(c => c.includes(t));
+  const hayPaisaje = paisaje && (paisaje.nota ?? paisaje.pct) > 0;
+  const enPaisaje = t => hayPaisaje && paisaje.claves.some(c => c.includes(t));
   // «Teide despejado» o, si no es seguro, con qué probabilidad se verá.
-  const teideClave = paisaje && paisaje.pct > 0 && paisaje.claves.find(c => c.includes('Teide'));
+  const teideClave = hayPaisaje && paisaje.claves.find(c => c.includes('Teide'));
   if (teideClave)
     datosEstado.push(el('span', { class: 'dato teide-dato' }, el('span', { class: 'triangulo' }),
       el('span', {}, mayuscula(teideClave.replace(/^el /, '')))));
