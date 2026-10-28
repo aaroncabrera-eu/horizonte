@@ -588,7 +588,7 @@ function tablaPartes(r) {
     r.partes.map(p => fila(el('span', {}, el('strong', {}, PARTE_TITULO[p.parte] || p.parte),
       el('span', { class: 'explica' }, comas(mayuscula(p.claves.join('; '))))), `${num(p.nota ?? p.pct / 10)} / 10`)),
     fila(el('span', {}, el('strong', {}, 'Nota final'),
-      el('span', { class: 'explica' }, 'La mejor de las tres más un cuarto de las otras: un cielo bonito compensa que no se vea el sol, y al revés')),
+      el('span', { class: 'explica' }, 'Basta con que una cosa salga bien para que merezca la pena ir: manda la mejor y las otras suman un poco')),
       `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
 }
@@ -605,7 +605,7 @@ function tablaNota(r) {
       libre != null ? `× ${coma(libre.toFixed(2))}` : '—'),
     r.paisaje && r.nota_luna != null ? fila(factor('La luna, con sus nubes'), `${num(r.nota_luna)} / 10`, 'subtotal') : null,
     r.paisaje ? fila(factor('Además, el paisaje', r.paisaje.claves.join('; ')), `${num(r.paisaje.nota ?? r.paisaje.pct / 10)} / 10`) : null,
-    fila(factor('Nota final', r.paisaje ? 'La mejor de las dos más un cuarto de la otra' : null), `${num(r.puntos)} / 10`, 'total'),
+    fila(factor('Nota final', r.paisaje ? 'Manda la mejor de las dos y la otra suma un poco' : null), `${num(r.puntos)} / 10`, 'total'),
     (r.notas || []).map(n => el('p', { class: 'nota' }, mayuscula(n))));
 }
 
@@ -1066,7 +1066,7 @@ const AYUDA = [
     texto: 'Un dibujo del horizonte de frente, como por la cámara: por dónde saldrá o se pondrá el sol o la luna cada 5 minutos, las nubes que da la previsión y la calima.',
     pie: 'Debajo, la rueda: todo tu horizonte visto desde arriba, con lo que tapa cada dirección (arrastra la bolita).' },
   { icono: 'nube', titulo: 'De dónde sale la nota',
-    texto: 'En amaneceres y atardeceres mira tres cosas: que el cielo se encienda de colores, que el sol toque algo bonito (el mar, el Teide…) y que luzca el paisaje. La nota es la posibilidad de que salga bien al menos una. Las nubes y la calima vienen de la previsión, fiable unos 5 días.',
+    texto: 'En amaneceres y atardeceres mira tres cosas: que el cielo se encienda de colores, que el sol toque algo bonito (el mar, el Teide…) y que luzca el paisaje. Basta con que una salga bien: un cielo bonito compensa que no se vea el sol, y al revés. Las nubes y la calima vienen de la previsión, fiable unos 5 días.',
     pie: 'Para más adelante, mira «Próximas ocasiones»: lunas llenas, lluvias de estrellas, la Vía Láctea… Instálala en el móvil: funciona sin cobertura.' },
 ];
 const AYUDA_VISTA = 'horizonte-ayuda-vista';
