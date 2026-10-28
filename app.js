@@ -317,7 +317,10 @@ function pintarLista() {
       const sub = estado.filtro ? [etiqueta(mejor.o, r), r.hora ? (r.color === 'pasado' ? 'ya pasó' : r.hora) : 'no se ve', marcaTexto(r.marca)].filter(Boolean).join(' · ')
         : r.color === 'pasado' ? 'Lo de hoy ya pasó' : r.color === 'rojo' ? 'Nada destacable ese día'
         : `${etiqueta(mejor.o, r)}${r.hora ? ' · ' + r.hora : ''}${r.marca ? ' ' + marcaTexto(r.marca) : ''}`;
-      const abrir = estado.filtro || !(r.color === 'rojo' || r.color === 'pasado') ? mejor.o : null;
+      // Tocar un spot abre su resumen con las cuatro opciones (Aaron,
+      // 28-10-2026: si no, solo se veía todo desde el mapa); con un filtro
+      // elegido, directo a esa opción.
+      const abrir = estado.filtro || null;
       return el('li', {}, el('button', { class: 'fila', onclick: () => abrirMirador(clave, abrir) },
         el('span', { class: 'icono-obj', html: svg(mejor.o, 20) }),
         el('span', { class: 'texto' }, el('span', { class: 'titulo' }, partesNombre(m.nombre)[0]), el('span', { class: 'sub' }, sub)),
@@ -834,10 +837,14 @@ function pintarDetalle() {
   const m = datos.miradores[estado.mirador];
   const r = resultadoVisto(estado.mirador, estado.objetivo);
   const partes = [
-    // Atrás: a la lista de spots (o a las ocasiones), con el mapa donde está;
-    // las cuatro opciones ya están arriba (Aaron, 23-10-2026).
-    el('button', { class: 'volver', onclick: () => { cerrarMirador(false); irArriba(); },
-      html: svg('volver', 18) + `<span>${textoVolver()}</span>` }),
+    // Atrás: al resumen del spot (Aaron, 28-10-2026); con un filtro elegido
+    // en la lista se llegó directo, así que a la lista de spots, con el mapa
+    // donde está.
+    estado.filtro
+      ? el('button', { class: 'volver', onclick: () => { cerrarMirador(false); irArriba(); },
+          html: svg('volver', 18) + `<span>${textoVolver()}</span>` })
+      : el('button', { class: 'volver', onclick: () => { estado.objetivo = null; estado.luna = null; pintarTodo(); irArriba(); },
+          html: svg('volver', 18) + '<span>Todas las opciones</span>' }),
     cabezaMirador(m),
     seccion('¿Cuándo?', botonesDias()),
     // Cambiar de opción sin volver al resumen (Aaron, 23-10-2026); cada una
