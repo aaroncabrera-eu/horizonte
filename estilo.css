@@ -420,3 +420,11 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .aviso-spot { margin: 6px 0 0; font-size: 12.5px; color: #a23b2a; }
 /* Qué dice cada modelo del tiempo (decisión 47). */
 .explica-modelos { margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--suave); }
+/* Galería de fotos de la gente en cada spot. */
+.fotos-galeria { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fotos-galeria figure { margin: 0; }
+.fotos-galeria img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; background: var(--fondo); }
+.fotos-galeria figcaption { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; font-size: 12.5px; }
+.fotos-galeria figcaption strong { font-size: 13px; }
+.fotos-galeria .comparar { display: flex; gap: 10px; color: var(--suave); }
+.fotos-galeria .comparar b { color: var(--texto); }

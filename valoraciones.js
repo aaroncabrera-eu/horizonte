@@ -40,6 +40,47 @@ async function cargarOpiniones() {
   } catch { /* sin red */ }
 }
 
+// --- Galería de cada spot (Aaron, 28-10-2026) -----------------------------------
+// Las fotos aprobadas de cualquier día, con la nota de la gente y la nuestra
+// de ese día (de datos.pasado si ya pasó), para ver cuándo acertamos.
+let galeria = [];
+
+async function cargarGaleria() {
+  try {
+    const resp = await fetch(`${SUPABASE}/rest/v1/rpc/galeria`, {
+      method: 'POST', headers: { ...CABECERAS, 'Content-Type': 'application/json' }, body: '{"cuantas": 120}' });
+    if (!resp.ok) return;
+    galeria = await resp.json();
+    if (estado.mirador && !estado.objetivo) pintarTodo();
+  } catch { /* sin red */ }
+}
+
+// Nuestra nota de ese día: de los días que enseña la web o de los pasados.
+function nuestraNota(spot, fecha, objetivo) {
+  const dia = (datos.miradores[spot].dias || {})[fecha] || ((datos.pasado || {})[spot] || {})[fecha];
+  const r = dia && dia[objetivo];
+  return r && r.puntos != null ? r.puntos : null;
+}
+
+function cajaGaleria(spot) {
+  const fotos = galeria.filter(g => g.spot === spot);
+  if (!fotos.length) return null;
+  return el('div', { class: 'caja galeria' },
+    el('h4', {}, 'Fotos de la gente'),
+    el('div', { class: 'fotos-galeria' }, fotos.map(g => {
+      const url = `${SUPABASE}/storage/v1/object/public/fotos/${g.foto}`;
+      const nuestra = nuestraNota(spot, g.fecha, g.objetivo);
+      const cuando = new Date(g.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+      return el('figure', {},
+        el('a', { href: url, target: '_blank', rel: 'noopener' }, el('img', { src: url, alt: `${CORTO[g.objetivo] || g.objetivo} en ${partesNombre(datos.miradores[spot].nombre)[0]}`, loading: 'lazy' })),
+        el('figcaption', {},
+          el('strong', {}, [CORTO[g.objetivo] || g.objetivo, cuando, g.hora_foto].filter(Boolean).join(' · ')),
+          el('span', { class: 'comparar' },
+            el('span', {}, 'La gente ', el('b', {}, coma(g.media))),
+            nuestra != null ? el('span', {}, 'Nosotros ', el('b', {}, coma(nuestra))) : null)));
+    })));
+}
+
 // «La gente que fue», dentro del evento: media, votos y fotos aprobadas.
 function cajaGente(spot, dia, objetivo, r) {
   const o = opiniones[claveEvento(spot, dia, objetivo)];
@@ -134,9 +175,13 @@ function cerrarMejorar() {
 // si era amanecer, atardecer o estrellas (lo que no hayas elegido ya).
 async function elegirFoto(archivo) {
   formulario.foto = archivo || null;
+  formulario.hora = null;
   const f = archivo && await fechaFoto(archivo);
   if (f) {
     const dia = f.slice(0, 10).replace(/:/g, '-'), hora = Number(f.slice(11, 13));
+    // La hora se manda aparte: al reducir la foto se pierde (Aaron, 28-10-2026:
+    // sirve para saber si se hizo antes, durante o después).
+    if (/^\d\d:\d\d$/.test(f.slice(11, 16))) formulario.hora = f.slice(11, 16);
     if (diasAtras().includes(dia)) formulario.dia = dia;
     if (!formulario.objetivo) formulario.objetivo = hora < 12 ? 'Amanecer' : hora < 21 ? 'Atardecer' : 'Estrellas';
   }
@@ -156,7 +201,8 @@ async function enviarFormulario() {
   const resp = await fetch(`${SUPABASE}/rest/v1/valoraciones`, {
     method: 'POST', headers: { ...CABECERAS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ spot: f.spot,
-      fecha: f.dia, objetivo: f.objetivo, nota: f.nota, dispositivo: dispositivo(), foto, permiso_foto: !!foto }) });
+      fecha: f.dia, objetivo: f.objetivo, nota: f.nota, dispositivo: dispositivo(), foto, permiso_foto: !!foto,
+      hora_foto: foto ? f.hora || null : null }) });
   if (resp.status === 409) throw new Error('Ya habías valorado eso mismo desde este móvil');
   if (!resp.ok) throw new Error('No se pudo guardar tu nota');
 }

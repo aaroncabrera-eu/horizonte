@@ -653,7 +653,8 @@ function pintarResumen() {
         pastilla(r)));
     }))),
     el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
-  ];
+    cajaGaleria(estado.mirador),      // fotos de la gente (valoraciones.js)
+  ].filter(Boolean);
 }
 
 // --- Cómo llegar, Avísame y Compartir (Aaron, 23-10-2026) -------------------
@@ -1213,6 +1214,7 @@ fetch('datos.json', { cache: 'no-cache' })
     datos = d;
     estado.dia = datos.dias[0];
     cargarOpiniones();
+    cargarGaleria();
     leerEnlace();
     iniciarMapa();
     document.getElementById('ayuda').addEventListener('click', e => { e.stopPropagation(); mostrarAyuda(); });
