@@ -894,6 +894,9 @@ function pintarDetalle() {
       r.puntos != null ? el('div', { class: 'nota-puntos' }, el('strong', {}, coma(r.puntos)), el('span', {}, 'de 10')) : null),
     datosEstado.length ? el('div', { class: 'datos-estado' }, datosEstado) : null));
   partes.push(acciones(m, r));
+  // Notas y fotos de la gente que fue (decisión 45, en valoraciones.js).
+  for (const caja of [cajaVotar(estado.mirador, estado.dia, estado.objetivo, r),
+    cajaGente(estado.mirador, estado.dia, estado.objetivo, r)]) if (caja) partes.push(caja);
 
   if (r.momentos && r.momentos.length) {
     partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Tu plan'),
@@ -1183,6 +1186,7 @@ fetch('datos.json', { cache: 'no-cache' })
   .then(d => {
     datos = d;
     estado.dia = datos.dias[0];
+    cargarOpiniones();
     leerEnlace();
     iniciarMapa();
     document.getElementById('ayuda').addEventListener('click', e => { e.stopPropagation(); mostrarAyuda(); });

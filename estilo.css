@@ -357,3 +357,25 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .alternativa .texto { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .alternativa .ir { display: flex; color: var(--suave); transform: rotate(-90deg); }
 .alternativa .aun-no { font-size: 12px; color: var(--suave); }
+/* Notas y fotos de la gente que fue (decisión 45). */
+.notas-voto { display: grid; grid-template-columns: repeat(11, 1fr); gap: 4px; margin: 8px 0 10px; }
+.nota-voto {
+  min-height: 36px; padding: 0; border-radius: 8px; border: 1px solid var(--borde);
+  background: var(--tarjeta); font: inherit; font-weight: 700; font-size: 14px; color: inherit; cursor: pointer;
+}
+.nota-voto[aria-pressed="true"] { background: var(--primario); border-color: var(--primario); color: #fff; }
+.boton-foto, .enviar-voto {
+  display: block; width: 100%; min-height: 40px; margin-top: 8px; border-radius: 10px;
+  font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.boton-foto { border: 1px dashed var(--borde); background: transparent; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.enviar-voto { border: 0; background: var(--primario); color: #fff; }
+.enviar-voto:disabled { opacity: .4; cursor: default; }
+.permiso { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: 13px; line-height: 1.4; }
+.permiso input { margin-top: 2px; }
+.error-voto { color: #a23b2a; font-size: 13px; margin: 8px 0 0; }
+.gracias { margin: 4px 0 0; font-size: 14px; }
+.comparar-notas { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.comparar-notas strong { font-size: 18px; }
+.fotos-gente { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.fotos-gente img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
