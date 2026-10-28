@@ -380,3 +380,9 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .fotos-gente { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
 .fotos-gente img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
 .notas-voto .opcion-filtro { padding: 0; justify-content: center; }
+/* Ayúdanos a mejorar: el spot, escrito o elegido de la lista. */
+.campo-spot {
+  width: 100%; min-height: 42px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--borde); background: var(--tarjeta); font: inherit; font-size: 16px; color: inherit;
+}
+.aviso-spot { margin: 6px 0 0; font-size: 12.5px; color: #a23b2a; }

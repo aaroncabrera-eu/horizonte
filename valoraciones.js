@@ -179,7 +179,8 @@ function pintarMejorar() {
   const nombres = { 0: 'Hoy', 1: 'Ayer', 2: 'Anteayer' };
   const dias = diasAtras().map((d, n) => [d, nombres[n] ||
     new Date(d + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })]);
-  const spots = Object.entries(datos.miradores).map(([clave, m]) => [clave, partesNombre(m.nombre)[0]]);
+  const spots = Object.entries(datos.miradores).map(([clave, m]) => [clave, partesNombre(m.nombre)[0]])
+    .sort((a, b) => a[1].localeCompare(b[1], 'es'));
   const listo = f.spot && f.objetivo && f.nota != null &&
     (!f.foto || f.permiso) && !f.enviando;
   const archivo = el('input', { type: 'file', accept: 'image/*', hidden: '', onchange: e => elegirFoto(e.target.files[0]) });
@@ -193,11 +194,11 @@ function pintarMejorar() {
       f.foto ? el('label', { class: 'permiso' },
         el('input', { type: 'checkbox', ...(f.permiso ? { checked: '' } : {}), onchange: e => { f.permiso = e.target.checked; pintarTodo(); } }),
         el('span', {}, 'Acepto que la foto se publique en Horizonte (la revisamos antes)')) : null),
-    seccion('¿Dónde?', eleccion('filtro', spots, f.spot, v => { f.spot = v; })),
+    seccion('¿Dónde?', campoSpot(spots, f)),
     seccion('¿Cuándo?', eleccion('filtro', dias, f.dia, v => { f.dia = v; })),
     seccion('¿Qué fuiste a ver?', eleccion('filtro', OBJETIVOS.map(o => [o, CORTO[o] || o]), f.objetivo, v => { f.objetivo = v; })),
     seccion('¿Cómo estuvo, del 0 al 10?', eleccion('notas-voto', Array.from({ length: 11 }, (_, n) => [n, String(n)]), f.nota, v => { f.nota = v; })),
-    el('button', { class: 'enviar-voto', ...(listo ? {} : { disabled: '' }), onclick: async () => {
+    botonEnviar = el('button', { class: 'enviar-voto', ...(listo ? {} : { disabled: '' }), onclick: async () => {
       f.enviando = true; f.error = ''; pintarTodo();
       try {
         await enviarFormulario();
@@ -210,6 +211,27 @@ function pintarMejorar() {
     f.error ? el('p', { class: 'error-voto' }, f.error + '.') : null,
     el('p', { class: 'pie' }, `Se puede valorar hasta ${DIAS_ATRAS} días atrás. No guardamos tu nombre ni nada que te identifique; de la foto no se sube dónde estabas.`),
   ].filter(Boolean);
+}
+
+let botonEnviar = null;            // se activa al escribir el spot, sin redibujar (se perdería el teclado)
+
+// Spot: desplegable por nombre en el que también se puede escribir para
+// buscar (Aaron, 28-10-2026: con muchos spots, los botones llenarían la
+// pantalla). Solo vale un spot de la lista; sin acentos ni mayúsculas.
+const sinAcentos = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+function campoSpot(spots, f) {
+  const lista = el('datalist', { id: 'spots-lista' }, spots.map(([, nombre]) => el('option', { value: nombre })));
+  const actual = spots.find(([clave]) => clave === f.spot);
+  const aviso = el('p', { class: 'aviso-spot', hidden: '' }, 'Elige uno de la lista.');
+  const campo = el('input', { class: 'campo-spot', type: 'text', list: 'spots-lista', autocomplete: 'off',
+    placeholder: 'Escribe o elige un spot', value: actual ? actual[1] : '',
+    oninput: e => {
+      const hallado = spots.find(([, nombre]) => sinAcentos(nombre) === sinAcentos(e.target.value));
+      f.spot = hallado ? hallado[0] : null;
+      aviso.hidden = Boolean(hallado) || !e.target.value.trim();
+      if (botonEnviar) botonEnviar.disabled = !(f.spot && f.objetivo && f.nota != null && (!f.foto || f.permiso));
+    } });
+  return [campo, lista, aviso];
 }
 
 // Botón para abrirlo: en la lista, vacío; en un evento que ya pasó, rellenado.
