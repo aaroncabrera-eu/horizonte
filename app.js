@@ -916,10 +916,6 @@ function pintarDetalle() {
   // Notas y fotos de la gente que fue (decisión 45, en valoraciones.js): si
   // ya pasó, el formulario rellenado con este evento.
   if (r.color === 'pasado') partes.push(botonMejorar({ spot: estado.mirador, dia: estado.dia, objetivo: estado.objetivo }));
-  const gente = cajaGente(estado.mirador, estado.dia, estado.objetivo, r);
-  if (gente) partes.push(gente);
-  const fotos = cajaGaleria(estado.mirador, estado.objetivo);     // de cualquier día
-  if (fotos) partes.push(fotos);
 
   if (r.momentos && r.momentos.length) {
     partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Tu plan'),
@@ -982,6 +978,12 @@ function pintarDetalle() {
     if (r.ideal) alternativas.push(alternativa('Momento ideal más cercano', r.ideal, estado.mirador, diaDe(r.ideal)));
   }
   if (alternativas.length) partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Alternativas'), ...alternativas));
+  // Lo que dice la gente, abajo del todo (Aaron, 28-10-2026): su nota de
+  // ese día y sus fotos de esta opción (de cualquier día).
+  const gente = cajaGente(estado.mirador, estado.dia, estado.objetivo, r);
+  if (gente) partes.push(gente);
+  const fotos = cajaGaleria(estado.mirador, estado.objetivo);
+  if (fotos) partes.push(fotos);
   partes.push(el('p', { class: 'pie' }, `El tiempo es una previsión y puede cambiar: revísalo el mismo día. Previsión del ${datos.generado}.`, sinTiempo()));
   return partes;
 }
