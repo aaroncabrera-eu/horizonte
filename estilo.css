@@ -381,8 +381,40 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .fotos-gente img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
 .notas-voto .opcion-filtro { padding: 0; justify-content: center; }
 /* Ayúdanos a mejorar: el spot, escrito o elegido de la lista. */
+.desplegable { position: relative; display: flex; align-items: center; }
+.desplegable .lupa, .desplegable .flecha-spot { position: absolute; display: flex; color: var(--suave); pointer-events: none; }
+.desplegable .lupa { left: 14px; }
+.desplegable .flecha-spot { right: 14px; }
+.desplegable.elegido .lupa { color: var(--pin); }
 .campo-spot {
-  width: 100%; min-height: 42px; padding: 0 12px; border-radius: 10px;
-  border: 1px solid var(--borde); background: var(--tarjeta); font: inherit; font-size: 16px; color: inherit;
+  width: 100%; min-height: 48px; padding: 0 42px; border-radius: 12px;
+  border: 1px solid var(--borde); background: var(--tarjeta); font: inherit; font-size: 16px; font-weight: 600; color: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+.campo-spot::placeholder { font-weight: 400; color: var(--suave); }
+.campo-spot:focus { outline: none; border-color: var(--primario); box-shadow: 0 0 0 3px var(--primario-claro); }
+.desplegable.elegido .campo-spot { border-color: var(--primario); }
+.opciones-spot {
+  list-style: none; margin: 6px 0 0; padding: 6px; border: 1px solid var(--borde); border-radius: 12px;
+  background: var(--tarjeta); box-shadow: var(--sombra); max-height: 300px; overflow-y: auto;
+}
+.opcion-spot {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 6px 10px;
+  border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.opcion-spot:hover, .opcion-spot[aria-selected="true"] { background: var(--primario-claro); }
+.opcion-spot .pin-spot {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 34px; height: 34px; border-radius: 50%; background: var(--fondo); color: var(--pin);
+}
+.opcion-spot .texto { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.opcion-spot strong { font-size: 15px; }
+.opcion-spot .texto span { font-size: 12.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sin-opciones { padding: 12px; font-size: 14px; color: var(--suave); }
+@media (min-width: 900px) {
+  .campo-spot { min-height: 54px; font-size: 17px; }
+  .opcion-spot { min-height: 58px; }
+  .opcion-spot strong { font-size: 16px; }
+  .opcion-spot .pin-spot { width: 38px; height: 38px; }
 }
 .aviso-spot { margin: 6px 0 0; font-size: 12.5px; color: #a23b2a; }

@@ -220,18 +220,47 @@ let botonEnviar = null;            // se activa al escribir el spot, sin redibuj
 // pantalla). Solo vale un spot de la lista; sin acentos ni mayúsculas.
 const sinAcentos = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 function campoSpot(spots, f) {
-  const lista = el('datalist', { id: 'spots-lista' }, spots.map(([, nombre]) => el('option', { value: nombre })));
+  // Lista propia en vez de la del teléfono (Aaron, 28-10-2026: la del móvil
+  // no le gustaba): se abre al tocar la casilla y se filtra al escribir.
   const actual = spots.find(([clave]) => clave === f.spot);
   const aviso = el('p', { class: 'aviso-spot', hidden: '' }, 'Elige uno de la lista.');
-  const campo = el('input', { class: 'campo-spot', type: 'text', list: 'spots-lista', autocomplete: 'off',
+  const opciones = el('ul', { class: 'opciones-spot', hidden: '' });
+  const caja = el('div', { class: 'desplegable' + (actual ? ' elegido' : '') });
+  const activarEnviar = () => {
+    if (botonEnviar) botonEnviar.disabled = !(f.spot && f.objetivo && f.nota != null && (!f.foto || f.permiso));
+  };
+  const elegir = (clave, nombre) => {
+    f.spot = clave; campo.value = nombre;
+    opciones.hidden = true; aviso.hidden = true;
+    caja.classList.add('elegido'); campo.blur(); activarEnviar();
+  };
+  // Las que contienen lo escrito (sin acentos ni mayúsculas); con un spot ya
+  // elegido, todas, para poder cambiarlo.
+  const pintarOpciones = () => {
+    const buscar = f.spot ? '' : sinAcentos(campo.value);
+    const quedan = spots.filter(([, nombre]) => sinAcentos(nombre).includes(buscar));
+    opciones.replaceChildren(...(quedan.length ? quedan.map(([clave, nombre]) => {
+      const m = datos.miradores[clave];
+      return el('li', {}, el('button', { type: 'button', class: 'opcion-spot', 'aria-selected': String(clave === f.spot),
+        // pointerdown + preventDefault: elegir antes de que la casilla pierda el foco.
+        onpointerdown: e => e.preventDefault(), onclick: () => elegir(clave, nombre) },
+        el('span', { class: 'pin-spot', html: svg('ruta', 18) }),
+        el('span', { class: 'texto' }, el('strong', {}, nombre), el('span', {}, `${partesNombre(m.nombre)[1] || 'Tenerife'} · ${m.altitud} m`))));
+    }) : [el('li', { class: 'sin-opciones' }, 'Ningún spot se llama así.')]));
+  };
+  const campo = el('input', { class: 'campo-spot', type: 'text', autocomplete: 'off', enterkeyhint: 'done',
     placeholder: 'Escribe o elige un spot', value: actual ? actual[1] : '',
-    oninput: e => {
-      const hallado = spots.find(([, nombre]) => sinAcentos(nombre) === sinAcentos(e.target.value));
+    onfocus: () => { pintarOpciones(); opciones.hidden = false; },
+    onblur: () => setTimeout(() => { opciones.hidden = true; aviso.hidden = Boolean(f.spot) || !campo.value.trim(); }, 120),
+    oninput: () => {
+      const hallado = spots.find(([, nombre]) => sinAcentos(nombre) === sinAcentos(campo.value));
       f.spot = hallado ? hallado[0] : null;
-      aviso.hidden = Boolean(hallado) || !e.target.value.trim();
-      if (botonEnviar) botonEnviar.disabled = !(f.spot && f.objetivo && f.nota != null && (!f.foto || f.permiso));
+      caja.classList.toggle('elegido', Boolean(hallado));
+      pintarOpciones(); opciones.hidden = false; aviso.hidden = true; activarEnviar();
     } });
-  return [campo, lista, aviso];
+  caja.append(el('span', { class: 'lupa', html: svg('ruta', 18) }), campo,
+    el('span', { class: 'flecha-spot', html: svg('abajo', 18) }));
+  return [caja, opciones, aviso];
 }
 
 // Botón para abrirlo: en la lista, vacío; en un evento que ya pasó, rellenado.
