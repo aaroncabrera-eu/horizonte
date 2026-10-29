@@ -1207,12 +1207,26 @@ function teselasDeLosMiradores() {
   return urls;
 }
 
+const ESPERA_TESELAS_MS = 15000;
+
 function prepararSinConexion() {
   if (!('serviceWorker' in navigator)) return;
   // updateViaCache 'none': buscar el trabajador nuevo sin esperar a la caché
   // del navegador (GitHub la deja 10 min).
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(() => navigator.serviceWorker.ready)
-    .then(reg => reg.active && reg.active.postMessage({ tipo: 'guardar-teselas', urls: teselasDeLosMiradores() }))
+    .then(reg => {
+      // El mapa de alrededor de los spots, para tenerlo sin cobertura: una vez
+      // al día y pasados unos segundos (Aaron, 29-10-2026: con más spots, al
+      // abrir competía con el mapa que estabas mirando y todo iba lento).
+      const hoy = hoyCanarias() + ':' + Object.keys(datos.miradores).length;
+      let hecho = null;
+      try { hecho = localStorage.getItem('horizonte-teselas'); } catch { /* sin memoria */ }
+      if (hecho === hoy || !reg.active) return;
+      setTimeout(() => {
+        reg.active.postMessage({ tipo: 'guardar-teselas', urls: teselasDeLosMiradores() });
+        try { localStorage.setItem('horizonte-teselas', hoy); } catch { /* sin memoria */ }
+      }, ESPERA_TESELAS_MS);
+    })
     .catch(() => { /* sin trabajador: la web sigue funcionando con red */ });
   // Versión nueva publicada: el trabajador nuevo toma el mando y la página se
   // recarga sola (si no, una pestaña abierta seguía con la vieja; Aaron,

@@ -4,7 +4,7 @@
 //
 // Súbelo junto al ?v= de index.html: al cambiar VERSION se rehace la caché
 // de la web (los trozos de mapa se conservan).
-const VERSION = '20261029a';
+const VERSION = '20261029b';
 const WEB = 'horizonte-web-' + VERSION;
 const MAPA = 'horizonte-mapa';
 const MAX_TESELAS = 2500;          // ~40-60 MB como mucho
@@ -84,13 +84,17 @@ async function teselaPrimeroGuardada(peticion) {
     const resp = await fetch(peticion);
     if (resp.ok) {             // los servidores del mapa permiten leerlas (CORS)
       await cache.put(peticion, resp.clone());
-      recortar(cache);
+      // Repasar todas las guardadas (hasta 2500) con cada tesela nueva hacía
+      // ir lento el mapa al arrastrarlo (Aaron, 29-10-2026): cada 100 basta.
+      if (++nuevas % 100 === 0) recortar(cache);
     }
     return resp;
   } catch {
     return Response.error();
   }
 }
+
+let nuevas = 0;                    // teselas guardadas desde que arrancó el trabajador
 
 async function recortar(cache) {
   const claves = await cache.keys();
