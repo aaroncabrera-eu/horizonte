@@ -848,9 +848,10 @@ function textoMarea(mareas, hora) {
 // las dos cosas: los días que faltan y si los modelos coinciden.
 const CLASES_SEGURIDAD = ['segura', 'media', 'floja'];
 const TEXTO_ACUERDO = {
-  alta: 'Previsión bastante segura: los modelos del tiempo coinciden',
-  media: 'Previsión con dudas: los modelos del tiempo no coinciden del todo',
-  baja: 'Previsión dudosa: los modelos del tiempo no se ponen de acuerdo',
+  // Cortos (Aaron, 29-10-2026: lo de los modelos era mucho texto).
+  alta: 'Previsión bastante segura',
+  media: 'Previsión con dudas',
+  baja: 'Previsión dudosa',
 };
 function seguridad(dia, acuerdo) {
   const faltan = Math.round((new Date(dia + 'T12:00') - new Date(hoyCanarias() + 'T12:00')) / 86400e3);
@@ -977,12 +978,7 @@ function pintarDetalle() {
   // ¿Cómo se calcula la nota? (Aaron, 23-10-2026): tabla con los puntos de
   // cada factor; sin nota (estrellas o si no se ve), las frases de siempre.
   const tabla = r.partes ? tablaPartes(r) : r.desglose ? tablaNota(r) : el('ul', { class: 'porque' }, r.porque.map(t => el('li', {}, mayuscula(t))));
-  // Qué dice cada modelo del tiempo (decisión 47).
-  const modelos = r.acuerdo && r.acuerdo.modelos ? el('p', { class: 'explica-modelos' },
-    'Nubes bajas según cada modelo del tiempo: ' +
-    Object.entries(r.acuerdo.modelos).map(([m, v]) => `${m} ${v} %`).join(', ') +
-    '. Usamos los cinco: la media para las nubes bajas y, para los colores, cuántos modelos los dan.') : null;
-  const lista = el('div', {}, tabla, modelos);
+  const lista = el('div', {}, tabla);
   lista.hidden = true;
   const boton = el('button', { class: 'boton', 'aria-expanded': 'false', onclick: () => {
     const abrir = lista.hidden; lista.hidden = !abrir; boton.setAttribute('aria-expanded', String(abrir));
