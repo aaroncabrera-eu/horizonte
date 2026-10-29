@@ -63,8 +63,9 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .leaflet-control-attribution { font-size: 10px; background: rgba(255,255,255,.75) !important; }
 
 /* Localizador rojo de los miradores y su nombre. */
-.pin { position: relative; width: 30px; height: 42px; transition: transform .15s; transform-origin: 50% 100%; }
-.pin svg { filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+/* Más pequeños (Aaron, 29-10-2026): con 8 spots el mapa se llenaba. */
+.pin { position: relative; width: 22px; height: 31px; transition: transform .15s; transform-origin: 50% 100%; }
+.pin svg { width: 22px; height: 31px; display: block; filter: drop-shadow(0 1.5px 2px rgba(0,0,0,.35)); }
 .pin.elegido { transform: scale(1.25); }
 .nombre-pin, .etiqueta-mapa {
   background: var(--tarjeta); border: none; border-radius: 8px; box-shadow: var(--sombra);

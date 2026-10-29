@@ -226,7 +226,7 @@ function pintarMapa() {
           .addTo(capaMiradores);
       }
     }
-    const icono = L.divIcon({ className: '', iconSize: [30, 42], iconAnchor: [15, 41],
+    const icono = L.divIcon({ className: '', iconSize: [22, 31], iconAnchor: [11, 30],
       html: `<div class="pin${elegido ? ' elegido' : ''}">${PIN}</div>` });
     // El nombre a la derecha, salvo que otro mirador esté justo a la derecha.
     const vecino = Object.values(datos.miradores).some(o => o !== m &&
@@ -234,7 +234,7 @@ function pintarMapa() {
     L.marker([m.lat, m.lon], { icon: icono, title: m.nombre, keyboard: true, riseOnHover: true })
       .bindTooltip(el('span', { onclick: ev => { L.DomEvent.stopPropagation(ev); abrirMirador(clave); } },
         partesNombre(m.nombre)[0]), { permanent: true, direction: vecino ? 'left' : 'right',
-        offset: vecino ? [-12, -24] : [12, -24], className: 'nombre-pin' })
+        offset: vecino ? [-9, -18] : [9, -18], className: 'nombre-pin' })
       .on('click', () => abrirMirador(clave))
       .addTo(capaMiradores);
   }
