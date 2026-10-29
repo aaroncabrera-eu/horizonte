@@ -25,6 +25,7 @@ const ICONOS = {
   calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   meteoro: '<path d="M3.5 3.5l9 9"/><path d="M8.5 3.5l5 5"/><path d="M3.5 8.5l5 5"/><circle cx="16" cy="16" r="3.5"/>',
   galaxia: '<ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-28 12 12)"/><circle cx="12" cy="12" r="1.9"/><path d="M5 6h.01M19 18h.01M18.5 5.5h.01M5.5 18.5h.01"/>',
+  ola: '<path d="M2 14c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M2 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>',
   campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   compartir: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
 };
@@ -828,6 +829,21 @@ function hoyCanarias() {
   try { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Atlantic/Canary' }); }   // AAAA-MM-DD
   catch { return datos.dias[0]; }
 }
+// Cómo está la marea a la hora del evento (mareas = [[«HH:MM», 'alta'|'baja'], …]):
+// cerca de una alta o baja (±1 h), esa; si no, si sube o baja y hasta cuándo.
+const OLAS_AVISO = 2;
+function textoMarea(mareas, hora) {
+  if (!mareas || !mareas.length || !hora) return null;
+  const min = h => { const [a, b] = h.split(':').map(Number); return a * 60 + b; };
+  const t = min(hora.split('-')[0]);
+  const junto = mareas.find(([h]) => Math.abs(min(h) - t) <= 60);
+  if (junto) return `Marea ${junto[1]} a las ${junto[0]}` + (junto[1] === 'baja' ? ': arena mojada con reflejos' : '');
+  const siguiente = mareas.find(([h]) => min(h) > t);
+  if (siguiente) return `Marea ${siguiente[1] === 'baja' ? 'bajando' : 'subiendo'}: ${siguiente[1]} a las ${siguiente[0]}`;
+  const anterior = mareas[mareas.length - 1];
+  return `Marea ${anterior[1] === 'alta' ? 'bajando' : 'subiendo'} desde las ${anterior[0]}`;
+}
+
 // Con varios modelos del tiempo (decisión 47, 28-10-2026) manda lo peor de
 // las dos cosas: los días que faltan y si los modelos coinciden.
 const CLASES_SEGURIDAD = ['segura', 'media', 'floja'];
@@ -892,6 +908,12 @@ function pintarDetalle() {
     datosEstado.push(el('span', { class: `dato seguridad ${clase}`, html: svg('reloj', 15) + `<span>${texto}</span>` }));
   }
   if (r.marca === '⭐') datosEstado.push(el('span', { class: 'dato ideal', html: svg('chispa', 15) + '<span>Momento ideal</span>' }));
+  // Playas (Aaron, 29-10-2026): la marea más cercana a la hora del evento
+  // (con la baja, la arena mojada refleja el cielo) y aviso si hay mar de fondo.
+  const marea = textoMarea(r.mareas, r.hora);
+  if (marea) datosEstado.push(el('span', { class: 'dato', html: svg('ola', 15) + `<span>${marea}</span>` }));
+  if (r.olas >= OLAS_AVISO) datosEstado.push(el('span', { class: 'dato seguridad floja', html: svg('ola', 15) +
+    `<span>Olas de ${coma(r.olas)} m: cuidado en la orilla</span>` }));
   // El Teide cuenta ese día en el paisaje (despejado y aire limpio).
   const paisaje = (r.partes || []).find(p => p.parte === 'Paisaje') || r.paisaje;
   const hayPaisaje = paisaje && (paisaje.nota ?? paisaje.pct) > 0;
