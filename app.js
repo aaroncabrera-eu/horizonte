@@ -702,9 +702,11 @@ function rachasDeMeses(meses) {
   return texto.length > 1 ? texto.slice(0, -1).join(', ') + ' y ' + texto[texto.length - 1] : texto[0];
 }
 
-function cajaEpoca(m) {
-  if (!m.epoca || !m.epoca.notas) return null;
-  const filas = OBJETIVOS.filter(o => m.epoca.notas[o]).map(o => {
+// En el resumen, una fila por opción; en el detalle (solo = la opción abierta),
+// solo esa, debajo de las alternativas (Aaron, 30-10-2026).
+function cajaEpoca(m, solo) {
+  if (!m.epoca || !m.epoca.notas || (solo && !m.epoca.notas[solo])) return null;
+  const filas = OBJETIVOS.filter(o => m.epoca.notas[o] && (!solo || o === solo)).map(o => {
     // Luna: buenos los meses con la llena en el momento ideal (⭐).
     const clase = o === 'Salida de luna'
       ? m.epoca.ideal.map(n => n ? 'bueno' : 'flojo')
@@ -723,7 +725,9 @@ function cajaEpoca(m) {
       el('span', { class: 'texto-epoca' }, texto));
   });
   return el('div', { class: 'caja' }, el('h4', {}, 'Mejor época'),
-    el('p', { class: 'nota-seccion' }, 'Qué meses vale más la pena venir, contando lo bonito que es y cuántos días suele estar despejado.'), ...filas);
+    el('p', { class: 'nota-seccion' }, solo
+      ? 'Qué meses se ve mejor desde aquí: hacia dónde sale o se pone, qué tiene delante y cuántos días suele estar despejado.'
+      : 'Qué meses vale más la pena venir, contando lo bonito que es y cuántos días suele estar despejado.'), ...filas);
 }
 
 // --- Cómo llegar, Avísame y Compartir (Aaron, 23-10-2026) -------------------
@@ -1066,6 +1070,8 @@ function pintarDetalle() {
     if (r.ideal) alternativas.push(alternativa('Momento ideal más cercano', r.ideal, estado.mirador, diaDe(r.ideal)));
   }
   if (alternativas.length) partes.push(el('div', { class: 'caja' }, el('h4', {}, 'Alternativas'), ...alternativas));
+  const epoca = cajaEpoca(m, estado.objetivo);
+  if (epoca) partes.push(epoca);
   // Lo que dice la gente, abajo del todo (Aaron, 28-10-2026): su nota de
   // ese día y sus fotos de esta opción (de cualquier día).
   const gente = cajaGente(estado.mirador, estado.dia, estado.objetivo, r);
