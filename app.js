@@ -676,9 +676,16 @@ function enlacesWebcams(m) {
 // vale el sitio si el cielo acompaña). Los meses buenos se nombran debajo.
 const MESES = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-// Umbrales de la nota media de un día bueno (bueno, regular): con el sol las
-// notas son más altas que con las estrellas.
-const UMBRAL_EPOCA = { Amanecer: [7.5, 6.5], Atardecer: [7.5, 6.5], Estrellas: [7, 5.5] };
+// Nota esperada de cada mes (Aaron, 30-10-2026: en el norte la panza de burro
+// tapa muchas tardes de verano): lo que vale un día bueno por la parte de días
+// despejados a esa hora, más un día malo (NOTA_DIA_MALO) por el resto.
+// Umbrales (bueno, regular) de esa nota esperada.
+const NOTA_DIA_MALO = 2;
+const UMBRAL_EPOCA = { Amanecer: [6.5, 5], Atardecer: [6.5, 5], Estrellas: [6, 4.5] };
+function notaEsperada(nota, despejado) {
+  if (nota == null) return null;
+  return despejado == null ? nota : despejado * nota + (1 - despejado) * NOTA_DIA_MALO;
+}
 
 // [3, 4, 5, 9] → «marzo a mayo y septiembre» (meses seguidos juntos; diciembre con enero).
 function rachasDeMeses(meses) {
@@ -701,9 +708,14 @@ function cajaEpoca(m) {
     // Luna: buenos los meses con la llena en el momento ideal (⭐).
     const clase = o === 'Salida de luna'
       ? m.epoca.ideal.map(n => n ? 'bueno' : 'flojo')
-      : m.epoca.notas[o].map(n => n >= UMBRAL_EPOCA[o][0] ? 'bueno' : n >= UMBRAL_EPOCA[o][1] ? 'regular' : 'flojo');
+      : m.epoca.notas[o].map((n, i) => notaEsperada(n, ((m.epoca.despejado || {})[o] || [])[i]))
+          .map(n => n >= UMBRAL_EPOCA[o][0] ? 'bueno' : n >= UMBRAL_EPOCA[o][1] ? 'regular' : 'flojo');
     const buenos = clase.map((c, i) => c === 'bueno' ? i : -1).filter(i => i >= 0);
-    const texto = buenos.length ? (o === 'Salida de luna' ? 'Luna llena ideal: ' : 'Mejor: ') + rachasDeMeses(buenos)
+    // Cuántos días suele estar despejado en esos meses (de 10).
+    const desp = (m.epoca.despejado || {})[o];
+    const media = desp && buenos.length ? Math.round(10 * buenos.reduce((s, i) => s + (desp[i] || 0), 0) / buenos.length) : null;
+    const texto = buenos.length ? (o === 'Salida de luna' ? 'Luna llena ideal: ' : 'Mejor: ') + rachasDeMeses(buenos) +
+      (media != null ? ` · despejado ${media} de cada 10 ${o === 'Amanecer' ? 'mañanas' : o === 'Estrellas' ? 'noches' : 'tardes'}` : '')
       : 'Ningún mes destaca';
     return el('div', { class: 'fila-epoca' },
       el('span', { class: 'nombre-epoca', html: svg(o, 16) + `<span>${CORTO[o] || o}</span>` }),
@@ -711,7 +723,7 @@ function cajaEpoca(m) {
       el('span', { class: 'texto-epoca' }, texto));
   });
   return el('div', { class: 'caja' }, el('h4', {}, 'Mejor época'),
-    el('p', { class: 'nota-seccion' }, 'Qué meses vale más la pena venir si el cielo acompaña.'), ...filas);
+    el('p', { class: 'nota-seccion' }, 'Qué meses vale más la pena venir, contando lo bonito que es y cuántos días suele estar despejado.'), ...filas);
 }
 
 // --- Cómo llegar, Avísame y Compartir (Aaron, 23-10-2026) -------------------
