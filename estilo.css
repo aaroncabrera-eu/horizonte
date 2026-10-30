@@ -427,3 +427,18 @@ button:focus-visible { outline: 3px solid var(--primario); outline-offset: 2px; 
 .fotos-galeria figcaption strong { font-size: 13px; }
 .fotos-galeria .comparar { display: flex; gap: 10px; color: var(--suave); }
 .fotos-galeria .comparar b { color: var(--texto); }
+/* Webcams del spot (solo hoy). */
+.webcams { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; color: var(--suave); }
+.webcam {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 999px;
+  background: var(--primario-claro); color: var(--primario); font-weight: 700; text-decoration: none;
+}
+/* Mejor época: 12 meses por opción. */
+.fila-epoca { display: grid; grid-template-columns: 96px 1fr; gap: 2px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--borde); }
+.nombre-epoca { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; }
+.meses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+.mes { text-align: center; font-size: 10.5px; font-weight: 700; padding: 3px 0; border-radius: 4px; }
+.mes.bueno { background: var(--verde-fondo); color: var(--verde); }
+.mes.regular { background: var(--amarillo-fondo); color: var(--amarillo); }
+.mes.flojo { background: var(--fondo); color: #9aa6b4; }
+.texto-epoca { grid-column: 2; font-size: 12px; color: var(--suave); }

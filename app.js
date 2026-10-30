@@ -26,6 +26,7 @@ const ICONOS = {
   meteoro: '<path d="M3.5 3.5l9 9"/><path d="M8.5 3.5l5 5"/><path d="M3.5 8.5l5 5"/><circle cx="16" cy="16" r="3.5"/>',
   galaxia: '<ellipse cx="12" cy="12" rx="10" ry="3.6" transform="rotate(-28 12 12)"/><circle cx="12" cy="12" r="1.9"/><path d="M5 6h.01M19 18h.01M18.5 5.5h.01M5.5 18.5h.01"/>',
   ola: '<path d="M2 14c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M2 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>',
+  camara: '<path d="M4 7.5h3l1.6-2h6.8l1.6 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   compartir: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
 };
@@ -640,6 +641,7 @@ function pintarResumen() {
   return [
     el('button', { class: 'volver', onclick: () => { cerrarMirador(false); irArriba(); }, html: svg('volver', 18) + `<span>${textoVolver()}</span>` }),
     cabezaMirador(m),
+    enlacesWebcams(m),
     seccion('¿Cuándo?', botonesDias()),
     seccion('¿Qué quieres ver?', el('ul', { class: 'lista' }, OBJETIVOS.map(o => {
       const r = resultado(estado.mirador, o);
@@ -653,9 +655,63 @@ function pintarResumen() {
           el('span', { class: 'sub' }, sub), nubes ? el('span', { class: 'sub' }, nubes) : null),
         pastilla(r)));
     }))),
+    cajaEpoca(m),
     el('p', { class: 'pie' }, `Toca una opción para ver el plan. Previsión del ${datos.generado}.`, sinTiempo()),
     cajaGaleria(estado.mirador),      // todas las fotos de la gente (valoraciones.js)
   ].filter(Boolean);
+}
+
+// --- Webcams (Aaron, 30-10-2026) ----------------------------------------------
+// La más cercana y útil de cada spot, para ver cómo está el cielo de verdad
+// antes de salir. Solo hoy (mañana no sirve de nada) y como enlace a su web.
+function enlacesWebcams(m) {
+  if (!m.webcams || !m.webcams.length || estado.dia !== hoyCanarias()) return null;
+  return el('div', { class: 'webcams' }, el('span', {}, 'Mira cómo está ahora:'),
+    m.webcams.map(w => el('a', { class: 'webcam', href: w.url, target: '_blank', rel: 'noopener',
+      html: svg('camara', 16) + `<span>Webcam ${w.nombre}</span>` })));
+}
+
+// --- Mejor época (Aaron, 30-10-2026) ------------------------------------------
+// Una franja de 12 meses por opción con la nota media sin el tiempo (lo que
+// vale el sitio si el cielo acompaña). Los meses buenos se nombran debajo.
+const MESES = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+// Umbrales de la nota media de un día bueno (bueno, regular): con el sol las
+// notas son más altas que con las estrellas.
+const UMBRAL_EPOCA = { Amanecer: [7.5, 6.5], Atardecer: [7.5, 6.5], Estrellas: [7, 5.5] };
+
+// [3, 4, 5, 9] → «marzo a mayo y septiembre» (meses seguidos juntos; diciembre con enero).
+function rachasDeMeses(meses) {
+  if (meses.length === 12) return 'todo el año';
+  const rachas = [];
+  for (const m of meses) {
+    const ultima = rachas[rachas.length - 1];
+    if (ultima && ultima[1] === m - 1) ultima[1] = m; else rachas.push([m, m]);
+  }
+  if (rachas.length > 1 && rachas[0][0] === 0 && rachas[rachas.length - 1][1] === 11) {
+    rachas[0][0] = rachas.pop()[0];
+  }
+  const texto = rachas.map(([a, b]) => a === b ? MESES_LARGO[a] : `${MESES_LARGO[a]} a ${MESES_LARGO[b]}`);
+  return texto.length > 1 ? texto.slice(0, -1).join(', ') + ' y ' + texto[texto.length - 1] : texto[0];
+}
+
+function cajaEpoca(m) {
+  if (!m.epoca || !m.epoca.notas) return null;
+  const filas = OBJETIVOS.filter(o => m.epoca.notas[o]).map(o => {
+    // Luna: buenos los meses con la llena en el momento ideal (⭐).
+    const clase = o === 'Salida de luna'
+      ? m.epoca.ideal.map(n => n ? 'bueno' : 'flojo')
+      : m.epoca.notas[o].map(n => n >= UMBRAL_EPOCA[o][0] ? 'bueno' : n >= UMBRAL_EPOCA[o][1] ? 'regular' : 'flojo');
+    const buenos = clase.map((c, i) => c === 'bueno' ? i : -1).filter(i => i >= 0);
+    const texto = buenos.length ? (o === 'Salida de luna' ? 'Luna llena ideal: ' : 'Mejor: ') + rachasDeMeses(buenos)
+      : 'Ningún mes destaca';
+    return el('div', { class: 'fila-epoca' },
+      el('span', { class: 'nombre-epoca', html: svg(o, 16) + `<span>${CORTO[o] || o}</span>` }),
+      el('div', { class: 'meses' }, clase.map((c, i) => el('span', { class: `mes ${c}`, title: MESES_LARGO[i] }, MESES[i]))),
+      el('span', { class: 'texto-epoca' }, texto));
+  });
+  return el('div', { class: 'caja' }, el('h4', {}, 'Mejor época'),
+    el('p', { class: 'nota-seccion' }, 'Qué meses vale más la pena venir si el cielo acompaña.'), ...filas);
 }
 
 // --- Cómo llegar, Avísame y Compartir (Aaron, 23-10-2026) -------------------
@@ -936,6 +992,8 @@ function pintarDetalle() {
       r.puntos != null ? el('div', { class: 'nota-puntos' }, el('strong', {}, coma(r.puntos)), el('span', {}, 'de 10')) : null),
     datosEstado.length ? el('div', { class: 'datos-estado' }, datosEstado) : null));
   partes.push(acciones(m, r));
+  const camaras = enlacesWebcams(m);
+  if (camaras) partes.push(camaras);
   // Notas y fotos de la gente que fue (decisión 45, en valoraciones.js): si
   // ya pasó, el formulario rellenado con este evento.
   if (r.color === 'pasado') partes.push(botonMejorar({ spot: estado.mirador, dia: estado.dia, objetivo: estado.objetivo }));
